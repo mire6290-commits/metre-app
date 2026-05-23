@@ -91,39 +91,39 @@ def get_item_info(item_name):
     return {"desc": f"Élément divers", "unite": "Ens", "prix_u": 250.0}
 
 # ==========================================
-# 1. Classifier
-# ==========================================
-class PDFClassifier:
-    @staticmethod
-    def classify(doc):
-        text_length = sum([len(page.get_text("text").strip()) for page in doc])
-        # Un vrai plan vectoriel contient généralement plus de 400 caractères.
-        return "VECTORIEL" if text_length > 400 else "SCANNE"
-
-# ==========================================
-# 2. ExtractionEngine
+# 1. ExtractionEngine (Hybride : Vectoriel + OCR)
 # ==========================================
 class ExtractionEngine:
     @staticmethod
-    def extract_vectoriel(doc):
-        return "\n".join([page.get_text("text") for page in doc])
-    
-    @staticmethod
-    def extract_scanne(doc):
-        st.info("📷 **Lecture des images (OCR) en cours :** Ce plan est scanné. L'application convertit les images en textes... ⏳")
-        text = ""
-        for page in doc:
-            pix = page.get_pixmap(dpi=200)
-            img = Image.open(io.BytesIO(pix.tobytes("jpeg")))
-            try:
-                text += pytesseract.image_to_string(img, lang="fra") + "\n"
-            except Exception as e:
-                st.error("⚠️ Moteur Tesseract OCR introuvable sur le serveur. Veuillez vérifier packages.txt.")
-                return ""
-        return text
+    def extract_all(doc):
+        st.info("📖 **Lecture hybride intelligente :** Le système lit le texte et scanne les images page par page... ⏳")
+        full_text = ""
+        
+        progress_bar = st.progress(0)
+        total_pages = len(doc)
+        
+        for i, page in enumerate(doc):
+            # 1. Tentative d'extraction vectorielle
+            page_text = page.get_text("text").strip()
+            
+            # 2. Si le texte est très faible (image, plan scanné, ou dessin complexe), on force l'OCR
+            if len(page_text) < 200:
+                try:
+                    pix = page.get_pixmap(dpi=150) # 150 DPI pour équilibre Vitesse/Qualité
+                    img = Image.open(io.BytesIO(pix.tobytes("jpeg")))
+                    ocr_text = pytesseract.image_to_string(img, lang="fra").strip()
+                    page_text += "\n" + ocr_text
+                except Exception:
+                    pass
+            
+            full_text += f"\n--- PAGE {i+1} ---\n" + page_text
+            progress_bar.progress((i + 1) / total_pages)
+            
+        progress_bar.empty()
+        return full_text
 
 # ==========================================
-# 3. Parser Métier (Intégration Llama 3 - JSON PRO)
+# 2. Parser Métier (Intégration Llama 3.1 - JSON PRO)
 # ==========================================
 class ParserMetier:
     @staticmethod
@@ -151,7 +151,7 @@ Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exa
 }}
 
 Texte à analyser :
-{text[:6000]}
+{text[:50000]}
 """
         
         payload = {
@@ -224,7 +224,7 @@ Texte à analyser :
         return {"metadata": {"projet": "Inconnu", "societe": "Inconnu", "date_plan": "", "description": "Extraction manuelle Regex."}, "materiaux": elements}
 
 # ==========================================
-# 4. Exporter
+# 3. Exporter
 # ==========================================
 class Exporter:
     @staticmethod
@@ -348,7 +348,6 @@ if uploaded_file is not None:
         
     if start_btn:
         doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-        pdf_type = PDFClassifier.classify(doc)
         
         # Extraction du logo (la plus grande image trouvée dans le document)
         logo_bytes = None
@@ -369,13 +368,11 @@ if uploaded_file is not None:
                     break
         st.session_state.logo_bytes = logo_bytes
         
-        if pdf_type == "VECTORIEL":
-            text = ExtractionEngine.extract_vectoriel(doc)
-        else:
-            text = ExtractionEngine.extract_scanne(doc)
+        # Extraction hybride du texte complet
+        text = ExtractionEngine.extract_all(doc)
         
         if text and len(text.strip()) > 10:
-            with st.spinner("⏳ Analyse du plan en cours... Veuillez patienter."):
+            with st.spinner("⏳ Analyse intelligente en cours... Veuillez patienter (Cela peut prendre 10 à 30 secondes)."):
                 
                 # Exécution silencieuse et automatique de l'analyse intelligente
                 resultats_dict = ParserMetier.parse_with_ai(text)
