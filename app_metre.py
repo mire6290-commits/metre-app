@@ -179,7 +179,7 @@ Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exa
 }}
 
 Texte à analyser :
-{clean_text[:12000]}
+{clean_text[:4000]}
 """
         
         payload = {
@@ -206,7 +206,7 @@ Texte à analyser :
                     st.warning("⚠️ Impossible de formater les données JSON.")
                     return {"metadata": {}, "materiaux": []}
             else:
-                st.error(f"Erreur Serveur ({response.status_code}).")
+                st.error(f"Erreur Serveur ({response.status_code}) : {response.text}")
                 return {"metadata": {}, "materiaux": []}
         except Exception as e:
             st.error(f"Erreur de connexion : {e}.")
