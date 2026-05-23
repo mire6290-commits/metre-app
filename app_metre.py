@@ -4,13 +4,54 @@ import re
 import pandas as pd
 import json
 import requests
+import datetime
 from io import BytesIO
 import io
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import pytesseract
 from PIL import Image
 
-st.set_page_config(page_title="Architecture IA Métré", page_icon="🏗️", layout="wide")
+st.set_page_config(page_title="METRE-PRO System", page_icon="🏗️", layout="wide")
+
+# ==========================================
+# INJECTION CSS POUR DESIGN PRO
+# ==========================================
+st.markdown("""
+<style>
+/* Masquer le menu et le footer de Streamlit pour faire plus "Logiciel" */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+
+/* Design du Header / Logo */
+.header-container {
+    background-color: #1a2c42;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+    display: flex;
+    align-items: center;
+    border-left: 8px solid #f39c12;
+}
+.logo-icon {
+    font-size: 45px;
+    margin-right: 20px;
+}
+.app-title {
+    color: white;
+    font-size: 30px;
+    font-weight: 800;
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+.app-subtitle {
+    color: #bdc3c7;
+    font-size: 15px;
+    margin: 0;
+    margin-top: 5px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ==========================================
 # 0. API KEY ET BASE DE DONNÉES
@@ -92,22 +133,23 @@ class ParserMetier:
         }
         
         prompt = f"""Tu es un expert en BTP et Métré. Analyse le texte suivant extrait d'un plan d'architecture/charpente.
-Ta mission est d'extraire TOUS les matériaux, profilés, bétons, accessoires, et leurs détails.
+Ta mission est d'extraire 1) Les informations du projet (Cartouche) et 2) TOUS les matériaux.
 
-Tu dois répondre UNIQUEMENT avec un tableau JSON valide. Chaque objet doit avoir :
-- "element": Le nom du matériau (ex: IPE 400, SIKAGROUT, TUBE PVC)
-- "infos": Les détails supplémentaires trouvés comme les dimensions, épaisseur, classe (ex: "Ep:08mm", "DN125", "CL6.8", "L=200mm"). Laisse vide si introuvable.
-- "unite": L'unité logique de mesure (ex: "U", "ml", "m²", "kg", "Ens").
-- "quantite": La quantité trouvée (nombre entier ou décimal). S'il n'y a pas de quantité claire, mets 1.
-
-Exemple :
-[
-    {{"element": "TUBE EN PVC", "infos": "DN125", "unite": "ml", "quantite": 5}},
-    {{"element": "IPE 400", "infos": "Long = 200mm", "unite": "U", "quantite": 12}}
-]
+Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exacte :
+{{
+    "metadata": {{
+        "projet": "Nom du projet ou titre du plan (laisse vide si introuvable)",
+        "societe": "Nom de l'entreprise, maitre d'ouvrage, client ou bureau d'étude (laisse vide si introuvable)",
+        "date_plan": "Date trouvée sur le plan (laisse vide si introuvable)"
+    }},
+    "materiaux": [
+        {{"element": "TUBE EN PVC", "infos": "DN125", "unite": "ml", "quantite": 5}},
+        {{"element": "IPE 400", "infos": "Long = 200mm", "unite": "U", "quantite": 12}}
+    ]
+}}
 
 Texte à analyser :
-{text[:5000]}
+{text[:6000]}
 """
         
         payload = {
@@ -120,11 +162,17 @@ Texte à analyser :
             response = requests.post(API_URL, headers=headers, json=payload)
             if response.status_code == 200:
                 result = response.json()['choices'][0]['message']['content']
-                match = re.search(r'\[\s*\{.*?\}\s*\]', result, re.DOTALL)
+                match = re.search(r'\{.*\}', result, re.DOTALL)
                 if match:
-                    items = json.loads(match.group(0))
+                    data_json = json.loads(match.group(0))
                     
-                    # Regrouper les éléments identiques pour additionner leurs quantités
+                    if "materiaux" in data_json:
+                        items = data_json["materiaux"]
+                        metadata = data_json.get("metadata", {"projet": "", "societe": "", "date_plan": ""})
+                    else:
+                        items = []
+                        metadata = {"projet": "", "societe": "", "date_plan": ""}
+                    
                     merged = {}
                     for item in items:
                         elem = str(item.get("element", "")).strip().upper()
@@ -140,13 +188,13 @@ Texte à analyser :
                             else:
                                 merged[key] = {"element": elem, "infos": infos, "unite": unite, "quantite": qty}
                                 
-                    st.success("✨ **Succès :** L'IA a lu le PDF et a structuré tous les détails (Dimensions, Quantités) comme un vrai Métreur ! 🧠")
-                    return list(merged.values())
+                    st.success("✔️ **Analyse terminée :** Le plan a été traité et les détails ont été structurés avec succès.")
+                    return {"metadata": metadata, "materiaux": list(merged.values())}
                 else:
-                    st.warning("⚠️ L'IA n'a pas pu formater le JSON correctement. (Passage au Regex).")
+                    st.warning("⚠️ Impossible de formater les données. (Passage au mode dégradé).")
                     return ParserMetier.parse_regex(text)
             else:
-                st.error(f"Erreur API ({response.status_code}): {response.text} - Passage au Regex.")
+                st.error(f"Erreur Serveur ({response.status_code}): {response.text} - Passage au mode dégradé.")
                 return ParserMetier.parse_regex(text)
         except Exception as e:
             st.error(f"Erreur de connexion : {e}. Passage au Regex.")
@@ -165,39 +213,52 @@ Texte à analyser :
         for b in boulons:
             elements.append({"element": f"Boulon {b[1].upper()}", "infos": "", "unite": "U", "quantite": int(b[0])})
             
-        return elements
+        return {"metadata": {"projet": "Inconnu", "societe": "Inconnu", "date_plan": ""}, "materiaux": elements}
 
 # ==========================================
 # 4. Exporter
 # ==========================================
 class Exporter:
     @staticmethod
-    def to_excel(df, total_general):
+    def to_excel(df, total_general, metadata):
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='Métré_Détaillé', startrow=2)
+            df.to_excel(writer, index=False, sheet_name='Métré_Détaillé', startrow=7)
             worksheet = writer.sheets['Métré_Détaillé']
             
             header_font = Font(bold=True, color="FFFFFF")
             header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
             border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
             
-            worksheet['A1'] = "DEVIS ESTIMATIF DÉTAILLÉ (Généré par IA)"
+            # En-tête PRO avec Métadonnées
+            worksheet['A1'] = "DEVIS ESTIMATIF DÉTAILLÉ (Généré par METRE-PRO)"
             worksheet['A1'].font = Font(bold=True, size=14, color="1F4E78")
             
-            # Ajustement des largeurs des colonnes PRO
-            col_widths = {'A': 20, 'B': 35, 'C': 30, 'D': 10, 'E': 15, 'F': 18, 'G': 18}
+            worksheet['A3'] = "Projet :"
+            worksheet['B3'] = metadata.get('projet', 'Non spécifié')
+            worksheet['A4'] = "Société / Client :"
+            worksheet['B4'] = metadata.get('societe', 'Non spécifié')
+            worksheet['A5'] = "Date :"
+            date_plan = metadata.get('date_plan', '')
+            date_export = datetime.datetime.now().strftime("%d/%m/%Y")
+            worksheet['B5'] = f"{date_plan if date_plan else date_export}"
+            
+            worksheet['A3'].font = Font(bold=True, color="1F4E78")
+            worksheet['A4'].font = Font(bold=True, color="1F4E78")
+            worksheet['A5'].font = Font(bold=True, color="1F4E78")
+            
+            col_widths = {'A': 25, 'B': 35, 'C': 30, 'D': 10, 'E': 15, 'F': 18, 'G': 18}
             for col_letter, width in col_widths.items():
                 worksheet.column_dimensions[col_letter].width = width
                 
             for col_num in range(len(df.columns)):
-                cell = worksheet.cell(row=3, column=col_num+1)
+                cell = worksheet.cell(row=8, column=col_num+1)
                 cell.font = header_font
                 cell.fill = header_fill
                 cell.border = border
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             
-            for row_idx, row in enumerate(df.values, 4):
+            for row_idx, row in enumerate(df.values, 9):
                 for col_idx, value in enumerate(row, 1):
                     cell = worksheet.cell(row=row_idx, column=col_idx, value=value)
                     cell.border = border
@@ -222,78 +283,124 @@ class Exporter:
 
 
 # ==========================================
-# INTERFACE STREAMLIT
+# INTERFACE LOGICIEL
 # ==========================================
-st.title("🧠 Pipeline IA Avancé : Lecture Totale du Plan (PRO)")
 
-use_ai = st.toggle("Activer l'Intelligence Artificielle (Groq Llama 3) pour lire tout le plan", value=True)
+# Affichage du Header PRO
+st.markdown("""
+<div class="header-container">
+    <div class="logo-icon">🏗️</div>
+    <div>
+        <p class="app-title">METRE-PRO SYSTEM</p>
+        <p class="app-subtitle">Solution Automatisée d'Extraction de Quantités et Métré BTP</p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Initialisation de la mémoire du navigateur (Session State) pour sauvegarder les résultats
+if "df" not in st.session_state: st.session_state.df = None
+if "total_general" not in st.session_state: st.session_state.total_general = 0.0
+if "last_file_name" not in st.session_state: st.session_state.last_file_name = None
+
+if "metadata" not in st.session_state: st.session_state.metadata = {}
 
 col1, col2 = st.columns([1, 2])
 with col1:
-    uploaded_file = st.file_uploader("📥 Importer le Plan (PDF Input)", type=["pdf"])
+    uploaded_file = st.file_uploader("Étape 1 : Importer le Plan (Format PDF)", type=["pdf"])
 
 if uploaded_file is not None:
-    doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-    pdf_type = PDFClassifier.classify(doc)
-    
-    if pdf_type == "VECTORIEL":
-        text = ExtractionEngine.extract_vectoriel(doc)
-    else:
-        text = ExtractionEngine.extract_scanne(doc)
-    
-    if text and len(text.strip()) > 10:
-        with st.spinner("🤖 L'IA est en train de lire le plan ligne par ligne..."):
-            
-            if use_ai:
-                resultats = ParserMetier.parse_with_ai(text)
-            else:
-                resultats = ParserMetier.parse_regex(text)
-            
-            if len(resultats) > 0:
-                data = []
-                total_general = 0.0
+    # Si l'utilisateur importe un nouveau fichier, on réinitialise les résultats
+    if st.session_state.last_file_name != uploaded_file.name:
+        st.session_state.df = None
+        st.session_state.total_general = 0.0
+        st.session_state.metadata = {}
+        st.session_state.last_file_name = uploaded_file.name
+        
+    with col1:
+        # Ajout d'un bouton pour lancer l'analyse manuellement
+        start_btn = st.button("🚀 Étape 2 : Lancer l'Analyse Automatique", type="primary", use_container_width=True)
+        
+    if start_btn:
+        doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+        pdf_type = PDFClassifier.classify(doc)
+        
+        if pdf_type == "VECTORIEL":
+            text = ExtractionEngine.extract_vectoriel(doc)
+        else:
+            text = ExtractionEngine.extract_scanne(doc)
+        
+        if text and len(text.strip()) > 10:
+            with st.spinner("⏳ Analyse du plan en cours... Veuillez patienter."):
                 
-                for item in resultats:
-                    ref = item["element"]
-                    info_db = get_item_info(ref)
+                # Exécution silencieuse et automatique de l'analyse intelligente
+                resultats_dict = ParserMetier.parse_with_ai(text)
+                metadata = resultats_dict.get("metadata", {})
+                resultats = resultats_dict.get("materiaux", [])
+                
+                if len(resultats) > 0:
+                    data = []
+                    tot = 0.0
                     
-                    unite = item.get("unite")
-                    if unite == "" or unite == "U": 
-                        unite = info_db["unite"] # Utilise la DB si l'IA n'a pas trouvé mieux que "U"
+                    for item in resultats:
+                        ref = item["element"]
+                        info_db = get_item_info(ref)
                         
-                    qty = item["quantite"]
-                    infos_supp = item.get("infos", "")
-                    
-                    prix_u = info_db["prix_u"]
-                    total_ligne = qty * prix_u
-                    total_general += total_ligne
-                    
-                    data.append({
-                        "Référence": ref,
-                        "Désignation": info_db["desc"],
-                        "Infos / Dimensions": infos_supp,
-                        "Unité": unite,
-                        "Quantité": qty,
-                        "Prix Unitaire": prix_u,
-                        "Total Ligne": total_ligne
-                    })
-                    
-                df = pd.DataFrame(data).sort_values(by="Total Ligne", ascending=False)
-                
-                with col2:
-                    st.metric(label="TOTAL GÉNÉRAL", value=f"{total_general:,.2f} DH")
-                
-                st.write("### ⚙️ Résultat de l'Extraction (Matériaux découverts)")
-                st.dataframe(df.style.format({"Prix Unitaire": "{:,.2f}", "Total Ligne": "{:,.2f}"}), use_container_width=True)
-                
-                st.write("### 📤 Exports (Outputs)")
-                exp_col1, exp_col2 = st.columns(2)
-                
-                with exp_col1:
-                    st.download_button("📊 Télécharger EXCEL (PRO)", Exporter.to_excel(df, total_general), "Metre_PRO.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-                with exp_col2:
-                    st.download_button("📑 Télécharger CSV (ERP)", Exporter.to_csv(df), "ERP_Import.csv", "text/csv", use_container_width=True)
-            else:
-                st.warning("⚠️ Aucun élément trouvé dans ce plan.")
-    else:
-        st.error("❌ Ce PDF est une image complète (Scanné) sans texte vectoriel. L'OCR est obligatoire pour l'analyser.")
+                        unite = item.get("unite")
+                        if unite == "" or unite == "U": 
+                            unite = info_db["unite"]
+                            
+                        qty = item["quantite"]
+                        infos_supp = item.get("infos", "")
+                        
+                        prix_u = info_db["prix_u"]
+                        total_ligne = qty * prix_u
+                        tot += total_ligne
+                        
+                        data.append({
+                            "Référence": ref,
+                            "Désignation": info_db["desc"],
+                            "Infos / Dimensions": infos_supp,
+                            "Unité": unite,
+                            "Quantité": qty,
+                            "Prix Unitaire": prix_u,
+                            "Total Ligne": total_ligne
+                        })
+                        
+                    # Sauvegarde dans la session (Mémoire)
+                    st.session_state.df = pd.DataFrame(data).sort_values(by="Total Ligne", ascending=False)
+                    st.session_state.total_general = tot
+                    st.session_state.metadata = metadata
+                else:
+                    st.warning("⚠️ Aucun élément trouvé dans ce plan.")
+        else:
+            st.error("❌ Ce PDF est une image complète (Scanné) sans texte vectoriel. L'OCR est obligatoire pour l'analyser.")
+
+    # Affichage des résultats s'ils sont dans la mémoire
+    if st.session_state.df is not None:
+        df = st.session_state.df
+        total_general = st.session_state.total_general
+        metadata = st.session_state.metadata
+        
+        with col2:
+            st.metric(label="TOTAL GÉNÉRAL", value=f"{total_general:,.2f} DH")
+        
+        st.write("### 📋 Étape 3 : Résultat du Métré")
+        
+        # Affichage des métadonnées
+        md_col1, md_col2, md_col3 = st.columns(3)
+        md_col1.info(f"**🏢 Projet :** {metadata.get('projet', 'Non spécifié')}")
+        md_col2.info(f"**💼 Client/Bureau :** {metadata.get('societe', 'Non spécifié')}")
+        
+        date_plan = metadata.get('date_plan', '')
+        date_export = datetime.datetime.now().strftime("%d/%m/%Y")
+        md_col3.info(f"**📅 Date :** {date_plan if date_plan else date_export}")
+        
+        st.dataframe(df.style.format({"Prix Unitaire": "{:,.2f}", "Total Ligne": "{:,.2f}"}), use_container_width=True)
+        
+        st.write("### 📤 Étape 4 : Exports BTP")
+        exp_col1, exp_col2 = st.columns(2)
+        
+        with exp_col1:
+            st.download_button("📊 Télécharger Fichier EXCEL", Exporter.to_excel(df, total_general, metadata), "Metre_PRO.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+        with exp_col2:
+            st.download_button("📑 Télécharger Fichier CSV", Exporter.to_csv(df), "ERP_Import.csv", "text/csv", use_container_width=True)
