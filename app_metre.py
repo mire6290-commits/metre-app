@@ -151,7 +151,7 @@ Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exa
 }}
 
 Texte à analyser :
-{text[:50000]}
+{text[:15000]}
 """
         
         payload = {
@@ -445,8 +445,8 @@ if uploaded_file is not None:
         # Création d'une copie du dataframe pour l'affichage avec la ligne TOTAL
         df_display = df.copy()
         total_row_df = pd.DataFrame([{
-            "Référence": "TOTAL GÉNÉRAL", "Désignation": "-", "Infos / Dimensions": "-", 
-            "Unité": "-", "Quantité": "-", "Prix Unitaire": "-", "Total Ligne": total_general
+            "Référence": "TOTAL GÉNÉRAL", "Désignation": "", "Infos / Dimensions": "", 
+            "Unité": "", "Quantité": None, "Prix Unitaire": None, "Total Ligne": total_general
         }])
         df_display = pd.concat([df_display, total_row_df], ignore_index=True)
         
@@ -455,7 +455,7 @@ if uploaded_file is not None:
             if s.name == len(df_display) - 1: return ['background-color: #f39c12; color: white; font-weight: bold'] * len(s)
             return [''] * len(s)
             
-        st.dataframe(df_display.style.apply(highlight_total, axis=1).format({"Prix Unitaire": "{:,.2f}", "Total Ligne": "{:,.2f}"}), use_container_width=True)
+        st.dataframe(df_display.style.apply(highlight_total, axis=1).format({"Prix Unitaire": "{:,.2f}", "Total Ligne": "{:,.2f}"}, na_rep=""), use_container_width=True)
         
         st.write("### 📝 Synthèse du Plan")
         st.info(metadata.get('description', "Aucune description trouvée dans ce plan."))
