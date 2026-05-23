@@ -149,10 +149,27 @@ class ParserMetier:
             "Authorization": f"Bearer {GROQ_TOKEN}",
             "Content-Type": "application/json"
         }
-        clean_text = re.sub(r'\s+', ' ', text)
+        # Filtrage intelligent pour ne garder que les lignes utiles (et leurs voisines)
+        lines = text.split('\n')
+        keywords = ['ipe', 'hea', 'upn', 'upe', 'l70', 'l80', 'l60', 'l50', 'l40', 'tn', 'pl', 'gousset', 'beche', 'poteau', 'poutre', 'tige', 'platine', 'raid', 'echantignole', 'panne', 'sabliere', 'tube', 'long', 'projet', 'client', 'affaire']
+        keep_indices = set()
         
-        # Retour à une extraction simple (pour ne pas perturber l'IA)
-        text_to_send = clean_text[:4500]
+        for i, line in enumerate(lines):
+            if any(kw in line.lower() for kw in keywords):
+                keep_indices.add(i-1)
+                keep_indices.add(i)
+                keep_indices.add(i+1)
+
+        filtered_lines = []
+        for i in sorted(list(keep_indices)):
+            if 0 <= i < len(lines):
+                filtered_lines.append(lines[i].strip())
+                
+        filtered_text = ' '.join(filtered_lines)
+        clean_text = re.sub(r'\s+', ' ', filtered_text)
+        
+        # On envoie jusqu'à 8000 caractères (ce qui couvre tout le document grâce au filtrage)
+        text_to_send = clean_text[:8000]
         
         prompt = f"""Tu es un expert en BTP et Métré de Charpente Métallique. Analyse le texte suivant extrait d'un plan.
 Ta mission est d'extraire les éléments structuraux pour créer un tableau de nomenclature exact.
