@@ -140,7 +140,8 @@ Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exa
     "metadata": {{
         "projet": "Nom du projet ou titre du plan (laisse vide si introuvable)",
         "societe": "Nom de l'entreprise, maitre d'ouvrage, client ou bureau d'étude (laisse vide si introuvable)",
-        "date_plan": "Date trouvée sur le plan (laisse vide si introuvable)"
+        "date_plan": "Date trouvée sur le plan (laisse vide si introuvable)",
+        "description": "Un bref résumé (1-2 phrases) de ce que représente ce plan (ex: Construction métallique d'un auvent...). Laisse vide si introuvable."
     }},
     "materiaux": [
         {{"element": "TUBE EN PVC", "infos": "DN125", "unite": "ml", "quantite": 5}},
@@ -162,16 +163,22 @@ Texte à analyser :
             response = requests.post(API_URL, headers=headers, json=payload)
             if response.status_code == 200:
                 result = response.json()['choices'][0]['message']['content']
-                match = re.search(r'\{.*\}', result, re.DOTALL)
+                match = re.search(r'(\{.*\}|\[.*\])', result, re.DOTALL)
                 if match:
-                    data_json = json.loads(match.group(0))
-                    
-                    if "materiaux" in data_json:
-                        items = data_json["materiaux"]
-                        metadata = data_json.get("metadata", {"projet": "", "societe": "", "date_plan": ""})
+                    try:
+                        data_json = json.loads(match.group(0))
+                    except:
+                        data_json = []
+                        
+                    if isinstance(data_json, list):
+                        items = data_json
+                        metadata = {"projet": "", "societe": "", "date_plan": "", "description": ""}
+                    elif isinstance(data_json, dict):
+                        items = data_json.get("materiaux", data_json.get("matériaux", data_json.get("materials", [])))
+                        metadata = data_json.get("metadata", {"projet": "", "societe": "", "date_plan": "", "description": ""})
                     else:
                         items = []
-                        metadata = {"projet": "", "societe": "", "date_plan": ""}
+                        metadata = {"projet": "", "societe": "", "date_plan": "", "description": ""}
                     
                     merged = {}
                     for item in items:
@@ -213,7 +220,7 @@ Texte à analyser :
         for b in boulons:
             elements.append({"element": f"Boulon {b[1].upper()}", "infos": "", "unite": "U", "quantite": int(b[0])})
             
-        return {"metadata": {"projet": "Inconnu", "societe": "Inconnu", "date_plan": ""}, "materiaux": elements}
+        return {"metadata": {"projet": "Inconnu", "societe": "Inconnu", "date_plan": "", "description": "Extraction manuelle Regex."}, "materiaux": elements}
 
 # ==========================================
 # 4. Exporter
@@ -432,7 +439,23 @@ if uploaded_file is not None:
         date_export = datetime.datetime.now().strftime("%d/%m/%Y à %H:%M")
         md_col3.info(f"**📅 Date / Heure :** {date_export}")
         
-        st.dataframe(df.style.format({"Prix Unitaire": "{:,.2f}", "Total Ligne": "{:,.2f}"}), use_container_width=True)
+        # Création d'une copie du dataframe pour l'affichage avec la ligne TOTAL
+        df_display = df.copy()
+        total_row_df = pd.DataFrame([{
+            "Référence": "TOTAL GÉNÉRAL", "Désignation": "-", "Infos / Dimensions": "-", 
+            "Unité": "-", "Quantité": "-", "Prix Unitaire": "-", "Total Ligne": total_general
+        }])
+        df_display = pd.concat([df_display, total_row_df], ignore_index=True)
+        
+        # Application d'un style spécifique pour la ligne Total
+        def highlight_total(s):
+            if s.name == len(df_display) - 1: return ['background-color: #f39c12; color: white; font-weight: bold'] * len(s)
+            return [''] * len(s)
+            
+        st.dataframe(df_display.style.apply(highlight_total, axis=1).format({"Prix Unitaire": "{:,.2f}", "Total Ligne": "{:,.2f}"}), use_container_width=True)
+        
+        st.write("### 📝 Synthèse du Plan")
+        st.info(metadata.get('description', "Aucune description trouvée dans ce plan."))
         
         st.write("### 📤 Étape 4 : Exports BTP")
         exp_col1, exp_col2 = st.columns(2)
