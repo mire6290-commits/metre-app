@@ -71,16 +71,15 @@ class ExtractionEngine:
     
     @staticmethod
     def extract_scanne(doc):
-        st.info("📷 **جاري قراءة الصور (OCR):** البلان مسكاني، التطبيق كيحاول يترجم التصاور لنصوص... هاد العملية كتاخد شوية د الوقت ⏳")
+        st.info("📷 **Lecture des images (OCR) en cours :** Ce plan est scanné. L'application convertit les images en textes... Cette opération prend un peu de temps ⏳")
         text = ""
         for page in doc:
             pix = page.get_pixmap(dpi=200)
             img = Image.open(io.BytesIO(pix.tobytes("jpeg")))
             try:
-                # كيستعمل Tesseract باش يقرا التصويرة (بالفرنسية حيت البلانات غالبا فرنسية)
                 text += pytesseract.image_to_string(img, lang="fra") + "\n"
             except Exception as e:
-                st.error("⚠️ لم يتم العثور على محرك Tesseract OCR. المرجو التأكد من إضافة packages.txt فـ Github.")
+                st.error("⚠️ Moteur Tesseract OCR introuvable. Veuillez vérifier packages.txt sur GitHub.")
                 return ""
         return text
 
@@ -113,7 +112,7 @@ class ParserMetier:
         """
         
         payload = {
-            "model": "llama3-8b-8192",
+            "model": "llama-3.1-8b-instant",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.1
         }
@@ -142,7 +141,7 @@ class ParserMetier:
                     st.warning("⚠️ L'IA n'a pas pu formater le JSON correctement. (Passage au système Regex classique).")
                     return ParserMetier.parse_regex(text)
             else:
-                st.error(f"Erreur API ({response.status_code}). Passage au Regex.")
+                st.error(f"Erreur API ({response.status_code}): {response.text} - Passage au Regex.")
                 return ParserMetier.parse_regex(text)
                 
         except Exception as e:
@@ -270,4 +269,4 @@ if uploaded_file is not None:
             else:
                 st.warning("⚠️ Aucun élément trouvé dans ce plan.")
     else:
-        st.error("❌ هاد الـ PDF عبارة عن صورة بالكامل ومافيه حتى نص مكتوب (Scanné). خاصو تقنية OCR باش يتقرا.")
+        st.error("❌ Ce PDF est une image complète (Scanné) sans texte vectoriel. L'OCR est obligatoire pour l'analyser.")
