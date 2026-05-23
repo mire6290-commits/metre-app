@@ -154,8 +154,16 @@ class ParserMetier:
         prompt = f"""Tu es un expert en BTP et Métré de Charpente Métallique. Analyse le texte suivant extrait d'un plan.
 Ta mission est d'extraire les éléments structuraux pour créer un tableau de nomenclature exact.
 
-RÈGLE ABSOLUE : Tu DOIS extraire tous les éléments (Poteaux, Potelets, Traverses, Pannes, Liernes, Bracons, Platines, Goussets, Tiges, etc.).
-Structure chaque ligne avec : pos (numéro de position si présent), nomenclature (ex: POTEAU, PANNE), designation (profilé ou plaque, ex: IPE400, TN2000*1000*20), quantite (nombre), longueur_mm (longueur en mm, null si non applicable).
+RÈGLE ABSOLUE : Tu DOIS extraire absolument tous les éléments, y compris les détails des assemblages :
+- Profilés principaux : Poteaux, Potelets, Traverses, Pannes, Liernes, Bracons, Lisses, Supports.
+- Pièces d'assemblages (très important) : Platines d'about, Plaques d'assise (Pied de poteau), Bêches, Raidisseurs (d'âme ou extérieurs), Echantignoles, Goussets, Tiges d'ancrage, Plaquettes d'appui, Jarrets.
+
+Structure chaque ligne avec : 
+- pos (numéro de position si présent)
+- nomenclature (Le rôle de la pièce, ex: POTEAU, BECHE, RAIDISSEUR POTEAU, PLATINE PIED DE POTEAU, TIGE D'ANCRAGE)
+- designation (La section/profilé ou les dimensions de plaque, ex: IPE400, HEA120, L50*5, TN300*300*20, ROND Ø24)
+- quantite (nombre)
+- longueur_mm (longueur en mm, null si non applicable, souvent null pour les platines)
 
 Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exacte :
 {{
