@@ -106,8 +106,9 @@ class ExtractionEngine:
             # 1. Tentative d'extraction vectorielle
             page_text = page.get_text("text").strip()
             
-            # 2. Si le texte est très faible (image, plan scanné, ou dessin complexe), on force l'OCR
-            if len(page_text) < 200:
+            # 2. Si le texte est faible ou si la page contient des images (plan mixte), on force l'OCR
+            images = page.get_images(full=True)
+            if len(page_text) < 1000 or len(images) > 0:
                 try:
                     pix = page.get_pixmap(dpi=150) # 150 DPI pour équilibre Vitesse/Qualité
                     img = Image.open(io.BytesIO(pix.tobytes("jpeg")))
@@ -137,6 +138,8 @@ class ParserMetier:
         
         prompt = f"""Tu es un expert en BTP et Métré. Analyse le texte suivant extrait d'un plan d'architecture/charpente.
 Ta mission est d'extraire 1) Les informations du projet (Cartouche) et 2) TOUS les matériaux.
+
+RÈGLE ABSOLUE : Tu DOIS extraire absolument TOUT ce qui ressemble à un matériau ou élément de construction, même si ce n'est pas standard (ex: Lierne, Lisse, Panne, Poutre, IPE, HEA, Tube, Béton, Acier, Armature, Ø12, Boulon, Platine, Cornière, etc.). Ne laisse RIEN de côté. Si un élément est mentionné plusieurs fois, additionne les quantités.
 
 Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exacte :
 {{
