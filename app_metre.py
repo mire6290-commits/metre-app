@@ -57,7 +57,7 @@ class PDFClassifier:
     @staticmethod
     def classify(doc):
         text_length = sum([len(page.get_text("text").strip()) for page in doc])
-        return "VECTORIEL" if text_length > 150 else "SCANNE"
+        return "VECTORIEL" if text_length > 50 else "SCANNE"
 
 # ==========================================
 # 2. ExtractionEngine
@@ -69,7 +69,8 @@ class ExtractionEngine:
     
     @staticmethod
     def extract_scanne(doc):
-        return "" # Simulation OCR
+        st.warning("📷 **تنبيه:** هاد البلان عبارة عن صور (Scanné). التطبيق غيحاول يقرأ أي نص متوفر، ولكن النتيجة تقدر ماتكونش 100% حيت مازال مافعلناش الـ OCR لقراءة الصور.")
+        return "\n".join([page.get_text("text") for page in doc])
 
 # ==========================================
 # 3. Parser Métier (Intégration Hugging Face LLM)
@@ -210,7 +211,7 @@ if uploaded_file is not None:
     else:
         text = ExtractionEngine.extract_scanne(doc)
     
-    if text:
+    if text and len(text.strip()) > 10:
         with st.spinner("🤖 L'IA est en train de lire le plan ligne par ligne..."):
             
             if use_ai:
@@ -250,4 +251,6 @@ if uploaded_file is not None:
                 with exp_col2:
                     st.download_button("📑 Télécharger CSV (ERP)", Exporter.to_csv(df), "ERP_Import.csv", "text/csv", use_container_width=True)
             else:
-                st.warning("⚠️ Aucun élément trouvé.")
+                st.warning("⚠️ Aucun élément trouvé dans ce plan.")
+    else:
+        st.error("❌ هاد الـ PDF عبارة عن صورة بالكامل ومافيه حتى نص مكتوب (Scanné). خاصو تقنية OCR باش يتقرا.")
