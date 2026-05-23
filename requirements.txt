@@ -3,3 +3,5 @@ PyMuPDF
 pandas
 openpyxl
 requests
+pytesseract
+Pillow

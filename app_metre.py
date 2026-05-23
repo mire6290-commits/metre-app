@@ -6,7 +6,10 @@ import json
 import requests
 from collections import Counter
 from io import BytesIO
+import io
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+import pytesseract
+from PIL import Image
 
 st.set_page_config(page_title="Architecture IA Métré", page_icon="🏗️", layout="wide")
 
@@ -69,8 +72,18 @@ class ExtractionEngine:
     
     @staticmethod
     def extract_scanne(doc):
-        st.warning("📷 **تنبيه:** هاد البلان عبارة عن صور (Scanné). التطبيق غيحاول يقرأ أي نص متوفر، ولكن النتيجة تقدر ماتكونش 100% حيت مازال مافعلناش الـ OCR لقراءة الصور.")
-        return "\n".join([page.get_text("text") for page in doc])
+        st.info("📷 **جاري قراءة الصور (OCR):** البلان مسكاني، التطبيق كيحاول يترجم التصاور لنصوص... هاد العملية كتاخد شوية د الوقت ⏳")
+        text = ""
+        for page in doc:
+            pix = page.get_pixmap(dpi=200)
+            img = Image.open(io.BytesIO(pix.tobytes("jpeg")))
+            try:
+                # كيستعمل Tesseract باش يقرا التصويرة (بالفرنسية حيت البلانات غالبا فرنسية)
+                text += pytesseract.image_to_string(img, lang="fra") + "\n"
+            except Exception as e:
+                st.error("⚠️ لم يتم العثور على محرك Tesseract OCR. المرجو التأكد من إضافة packages.txt فـ Github.")
+                return ""
+        return text
 
 # ==========================================
 # 3. Parser Métier (Intégration Hugging Face LLM)
