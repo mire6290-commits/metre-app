@@ -97,7 +97,8 @@ class PDFClassifier:
     @staticmethod
     def classify(doc):
         text_length = sum([len(page.get_text("text").strip()) for page in doc])
-        return "VECTORIEL" if text_length > 50 else "SCANNE"
+        # Un vrai plan vectoriel contient généralement plus de 400 caractères.
+        return "VECTORIEL" if text_length > 400 else "SCANNE"
 
 # ==========================================
 # 2. ExtractionEngine
@@ -196,7 +197,7 @@ Texte à analyser :
                                 merged[key] = {"element": elem, "infos": infos, "unite": unite, "quantite": qty}
                                 
                     st.success("✔️ **Analyse terminée :** Le plan a été traité et les détails ont été structurés avec succès.")
-                    return {"metadata": metadata, "materiaux": list(merged.values())}
+                    return {"metadata": metadata, "materiaux": list(merged.values()), "raw_response": result}
                 else:
                     st.warning("⚠️ Impossible de formater les données. (Passage au mode dégradé).")
                     return ParserMetier.parse_regex(text)
@@ -204,7 +205,7 @@ Texte à analyser :
                 st.error(f"Erreur Serveur ({response.status_code}): {response.text} - Passage au mode dégradé.")
                 return ParserMetier.parse_regex(text)
         except Exception as e:
-            st.error(f"Erreur de connexion : {e}. Passage au Regex.")
+            st.error(f"Erreur de connexion : {e}. Passage au mode dégradé.")
             return ParserMetier.parse_regex(text)
 
     @staticmethod
@@ -380,6 +381,7 @@ if uploaded_file is not None:
                 resultats_dict = ParserMetier.parse_with_ai(text)
                 metadata = resultats_dict.get("metadata", {})
                 resultats = resultats_dict.get("materiaux", [])
+                raw_response = resultats_dict.get("raw_response", "")
                 
                 if len(resultats) > 0:
                     data = []
@@ -416,6 +418,10 @@ if uploaded_file is not None:
                     st.session_state.metadata = metadata
                 else:
                     st.warning("⚠️ Aucun élément trouvé dans ce plan.")
+                    with st.expander("🔍 Mode Débogage (Voir pourquoi l'IA n'a rien trouvé)"):
+                        st.write("Ceci arrive souvent si le plan est une image (Scanné) ou s'il ne contient pas de vrai texte.")
+                        st.text_area("Texte extrait du PDF (Ce que l'IA a vu) :", text[:2000], height=200)
+                        st.text_area("Réponse brute de l'IA :", raw_response, height=200)
         else:
             st.error("❌ Ce PDF est une image complète (Scanné) sans texte vectoriel. L'OCR est obligatoire pour l'analyser.")
 
