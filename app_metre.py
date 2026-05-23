@@ -454,6 +454,13 @@ if uploaded_file is not None:
         
         with col2:
             st.metric(label="TOTAL GÉNÉRAL", value=f"{total_general:,.2f} DH")
+            
+            st.write("---")
+            st.write("### 📤 Exporter le Métré")
+            file_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+            
+            st.download_button("📊 Télécharger Fichier EXCEL (PRO)", Exporter.to_excel(df, total_general, metadata, st.session_state.logo_bytes), f"METRE_{file_date}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            st.download_button("📑 Télécharger Données (CSV)", Exporter.to_csv(df), f"METRE_{file_date}.csv", "text/csv", use_container_width=True)
         
         st.write("### 📋 Étape 3 : Résultat du Métré")
         
@@ -487,15 +494,3 @@ if uploaded_file is not None:
         if st.session_state.plan_preview:
             st.write("### 🖼️ Aperçu du Plan")
             st.image(st.session_state.plan_preview, use_container_width=True)
-        
-        st.write("### 📤 Étape 4 : Exports BTP")
-        exp_col1, exp_col2 = st.columns(2)
-        
-        file_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-        file_name_excel = f"METRE_{file_date}.xlsx"
-        file_name_csv = f"METRE_{file_date}.csv"
-        
-        with exp_col1:
-            st.download_button("📊 Télécharger Fichier EXCEL", Exporter.to_excel(df, total_general, metadata, st.session_state.logo_bytes), file_name_excel, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
-        with exp_col2:
-            st.download_button("📑 Télécharger Fichier CSV", Exporter.to_csv(df), file_name_csv, "text/csv", use_container_width=True)
