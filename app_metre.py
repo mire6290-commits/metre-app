@@ -151,7 +151,9 @@ class ParserMetier:
         }
         clean_text = re.sub(r'\s+', ' ', text)
         
-        # Recherche intelligente de la zone de nomenclature
+        # On prend le début du document (souvent le cartouche/titre) + la zone de nomenclature
+        text_debut = clean_text[:1000]
+        
         start_idx = 0
         keywords = ['nomenclature', 'désignation', 'repère', 'ipe', 'hea', 'poteau', 'platine']
         for kw in keywords:
@@ -160,7 +162,8 @@ class ParserMetier:
                 start_idx = max(0, idx - 300)
                 break
                 
-        text_to_send = clean_text[start_idx : start_idx + 4000]
+        text_nomenc = clean_text[start_idx : start_idx + 3000]
+        text_to_send = f"--- DÉBUT DU PLAN (CARTOUCHE) ---\n{text_debut}\n\n--- ZONE NOMENCLATURE ---\n{text_nomenc}"
         
         prompt = f"""Tu es un expert en BTP et Métré de Charpente Métallique. Analyse le texte suivant extrait d'un plan.
 Ta mission est d'extraire les éléments structuraux pour créer un tableau de nomenclature exact.
@@ -179,9 +182,9 @@ Structure chaque ligne avec :
 Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exacte :
 {{
     "metadata": {{
-        "projet": "Nom du projet",
-        "societe": "Nom du client",
-        "date_plan": "Date"
+        "projet": "<Remplace par le nom du projet trouvé au début, sinon laisse vide>",
+        "societe": "<Remplace par le nom du client ou maitre d'ouvrage, sinon laisse vide>",
+        "date_plan": "<Remplace par la date, sinon laisse vide>"
     }},
     "materiaux": [
         {{"pos": "1", "nomenclature": "POTEAU", "designation": "IPE400", "quantite": 14, "longueur_mm": 4000}},
