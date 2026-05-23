@@ -330,6 +330,7 @@ if "last_file_name" not in st.session_state: st.session_state.last_file_name = N
 
 if "metadata" not in st.session_state: st.session_state.metadata = {}
 if "logo_bytes" not in st.session_state: st.session_state.logo_bytes = None
+if "plan_preview" not in st.session_state: st.session_state.plan_preview = None
 
 col1, col2 = st.columns([1, 2])
 with col1:
@@ -342,6 +343,7 @@ if uploaded_file is not None:
         st.session_state.total_general = 0.0
         st.session_state.metadata = {}
         st.session_state.logo_bytes = None
+        st.session_state.plan_preview = None
         st.session_state.last_file_name = uploaded_file.name
         
     with col1:
@@ -350,6 +352,13 @@ if uploaded_file is not None:
         
     if start_btn:
         doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+        
+        # Génération de l'aperçu du plan (Première page)
+        try:
+            pix = doc[0].get_pixmap(dpi=150)
+            st.session_state.plan_preview = Image.open(io.BytesIO(pix.tobytes("jpeg")))
+        except Exception:
+            pass
         
         # Extraction du logo (la plus grande image trouvée dans le document)
         logo_bytes = None
@@ -471,6 +480,10 @@ if uploaded_file is not None:
         
         st.write("### 📝 Synthèse du Plan")
         st.info(metadata.get('description', "Aucune description trouvée dans ce plan."))
+        
+        if st.session_state.plan_preview:
+            st.write("### 🖼️ Aperçu du Plan")
+            st.image(st.session_state.plan_preview, use_container_width=True)
         
         st.write("### 📤 Étape 4 : Exports BTP")
         exp_col1, exp_col2 = st.columns(2)
