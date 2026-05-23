@@ -132,6 +132,8 @@ class ParserMetier:
             "Authorization": f"Bearer {GROQ_TOKEN}",
             "Content-Type": "application/json"
         }
+        # Nettoyage du texte (suppression des espaces multiples) pour économiser des Tokens
+        clean_text = re.sub(r'\s+', ' ', text)
         
         prompt = f"""Tu es un expert en BTP et Métré. Analyse le texte suivant extrait d'un plan d'architecture/charpente.
 Ta mission est d'extraire 1) Les informations du projet (Cartouche) et 2) TOUS les matériaux.
@@ -151,7 +153,7 @@ Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exa
 }}
 
 Texte à analyser :
-{text[:15000]}
+{clean_text[:12000]}
 """
         
         payload = {
@@ -381,33 +383,43 @@ if uploaded_file is not None:
                 raw_response = resultats_dict.get("raw_response", "")
                 
                 if len(resultats) > 0:
-                    data = []
+                    grouped_data = {}
                     tot = 0.0
                     
                     for item in resultats:
-                        ref = item["element"]
+                        ref = item.get("element", "Inconnu")
                         info_db = get_item_info(ref)
                         
-                        unite = item.get("unite")
+                        unite = item.get("unite", "")
                         if unite == "" or unite == "U": 
                             unite = info_db["unite"]
                             
-                        qty = item["quantite"]
-                        infos_supp = item.get("infos", "")
+                        try: qty = float(item.get("quantite", 1))
+                        except: qty = 1.0
                         
+                        infos_supp = item.get("infos", "")
                         prix_u = info_db["prix_u"]
                         total_ligne = qty * prix_u
+                        
+                        key = f"{ref}____{infos_supp}____{unite}____{prix_u}"
+                        
+                        if key in grouped_data:
+                            grouped_data[key]["Quantité"] += qty
+                            grouped_data[key]["Total Ligne"] += total_ligne
+                        else:
+                            grouped_data[key] = {
+                                "Référence": ref,
+                                "Désignation": info_db["desc"],
+                                "Infos / Dimensions": infos_supp,
+                                "Unité": unite,
+                                "Quantité": qty,
+                                "Prix Unitaire": prix_u,
+                                "Total Ligne": total_ligne
+                            }
+                        
                         tot += total_ligne
                         
-                        data.append({
-                            "Référence": ref,
-                            "Désignation": info_db["desc"],
-                            "Infos / Dimensions": infos_supp,
-                            "Unité": unite,
-                            "Quantité": qty,
-                            "Prix Unitaire": prix_u,
-                            "Total Ligne": total_ligne
-                        })
+                    data = list(grouped_data.values())
                         
                     # Sauvegarde dans la session (Mémoire)
                     st.session_state.df = pd.DataFrame(data).sort_values(by="Total Ligne", ascending=False)
