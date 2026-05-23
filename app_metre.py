@@ -11,7 +11,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import pytesseract
 from PIL import Image
 
-st.set_page_config(page_title="METRE-PRO System", page_icon="🏗️", layout="wide")
+st.set_page_config(page_title="METRE-TEST System", page_icon="🏗️", layout="wide")
 
 # ==========================================
 # INJECTION CSS POUR DESIGN PRO
@@ -244,7 +244,7 @@ class Exporter:
             border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
             
             # En-tête PRO avec Métadonnées
-            worksheet['A1'] = "DEVIS ESTIMATIF DÉTAILLÉ (Généré par METRE-PRO)"
+            worksheet['A1'] = "MÉTRÉ DÉTAILLÉ (Généré par METRE-TEST)"
             worksheet['A1'].font = Font(bold=True, size=14, color="1F4E78")
             
             worksheet['A3'] = "Projet :"
@@ -320,7 +320,7 @@ st.markdown("""
 <div class="header-container">
     <div class="logo-icon">🏗️</div>
     <div>
-        <p class="app-title">METRE-PRO SYSTEM</p>
+        <p class="app-title">METRE-TEST SYSTEM</p>
         <p class="app-subtitle">Solution Automatisée d'Extraction de Quantités et Métré BTP</p>
     </div>
 </div>
@@ -459,7 +459,7 @@ if uploaded_file is not None:
             st.write("### 📤 Exporter le Métré")
             file_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
             
-            st.download_button("📊 Télécharger Fichier EXCEL (PRO)", Exporter.to_excel(df, total_general, metadata, st.session_state.logo_bytes), f"METRE_{file_date}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            st.download_button("📊 Télécharger Fichier EXCEL (TEST)", Exporter.to_excel(df, total_general, metadata, st.session_state.logo_bytes), f"METRE_{file_date}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
             st.download_button("📑 Télécharger Données (CSV)", Exporter.to_csv(df), f"METRE_{file_date}.csv", "text/csv", use_container_width=True)
         
         st.write("### 📋 Étape 3 : Résultat du Métré")
