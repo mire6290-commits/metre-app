@@ -196,7 +196,8 @@ Texte à analyser :
         payload = {
             "model": "llama-3.1-8b-instant",
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.1
+            "temperature": 0.1,
+            "max_tokens": 3000
         }
         
         try:
@@ -205,8 +206,18 @@ Texte à analyser :
                 result = response.json()['choices'][0]['message']['content']
                 match = re.search(r'(\{.*\}|\[.*\])', result, re.DOTALL)
                 if match:
-                    try: data_json = json.loads(match.group(0))
-                    except: data_json = {}
+                    json_str = match.group(0)
+                    try: 
+                        data_json = json.loads(json_str)
+                    except: 
+                        # Tentative de réparation si le JSON est coupé à la fin
+                        last_brace = json_str.rfind('}')
+                        if last_brace != -1:
+                            json_str = json_str[:last_brace+1] + '\n    ]\n}'
+                            try: data_json = json.loads(json_str)
+                            except: data_json = {}
+                        else:
+                            data_json = {}
                         
                     items = data_json.get("materiaux", [])
                     metadata = data_json.get("metadata", {})
