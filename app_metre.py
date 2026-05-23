@@ -151,19 +151,8 @@ class ParserMetier:
         }
         clean_text = re.sub(r'\s+', ' ', text)
         
-        # On prend le début du document (souvent le cartouche/titre) + la zone de nomenclature
-        text_debut = clean_text[:1000]
-        
-        start_idx = 0
-        keywords = ['nomenclature', 'désignation', 'repère', 'ipe', 'hea', 'poteau', 'platine']
-        for kw in keywords:
-            idx = clean_text.lower().find(kw)
-            if idx != -1:
-                start_idx = max(0, idx - 300)
-                break
-                
-        text_nomenc = clean_text[start_idx : start_idx + 3000]
-        text_to_send = f"--- DÉBUT DU PLAN (CARTOUCHE) ---\n{text_debut}\n\n--- ZONE NOMENCLATURE ---\n{text_nomenc}"
+        # Retour à une extraction simple (pour ne pas perturber l'IA)
+        text_to_send = clean_text[:4500]
         
         prompt = f"""Tu es un expert en BTP et Métré de Charpente Métallique. Analyse le texte suivant extrait d'un plan.
 Ta mission est d'extraire les éléments structuraux pour créer un tableau de nomenclature exact.
