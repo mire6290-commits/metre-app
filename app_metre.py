@@ -16,9 +16,8 @@ st.set_page_config(page_title="Architecture IA Métré", page_icon="🏗️", la
 # ==========================================
 # 0. API KEY ET BASE DE DONNÉES
 # ==========================================
-HF_TOKEN = "hf_" + "TawcWxEeTSMpSPqopLiLMMusMKhPlavgly"
-# نموذج Mistral 7B السريع للغة
-API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
+GROQ_TOKEN = "gsk_" + "rL7iv9leEcHqfbdKrnlvWGdyb3FYSrEtimGJWVH6NruYOP3pFqsG"
+API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 BASE_DONNEES = {
     "IPE400": {"desc": "Profilé IPE 400 - Acier S275", "unite": "U", "prix_u": 2500.0},
@@ -91,10 +90,13 @@ class ExtractionEngine:
 class ParserMetier:
     @staticmethod
     def parse_with_ai(text):
-        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+        headers = {
+            "Authorization": f"Bearer {GROQ_TOKEN}",
+            "Content-Type": "application/json"
+        }
         
         # 🚀 هادا هو العقل ديال الذكاء الاصطناعي: كنقولو ليه جبد أي مادة البناء
-        prompt = f"""[INST] Tu es un expert en ingénierie et BTP. Lis le texte suivant extrait d'un plan.
+        prompt = f"""Tu es un expert en ingénierie et BTP. Lis le texte suivant extrait d'un plan.
         Ta mission : Extraire TOUS les matériaux (IPE, Béton, Tubes PVC, Sikagrout, Tôles Nervesco, Goussets, Boulons, etc.) et leurs quantités.
         Si la quantité n'est pas écrite, mets 1.
         
@@ -107,15 +109,21 @@ class ParserMetier:
         ]
         
         Texte à analyser :
-        {text[:3000]}
-        [/INST]"""
+        {text[:4000]}
+        """
+        
+        payload = {
+            "model": "llama3-8b-8192",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1
+        }
         
         try:
-            # كنعيطو لـ Mistral عبر Hugging Face
-            response = requests.post(API_URL, headers=headers, json={"inputs": prompt, "parameters": {"max_new_tokens": 1500, "temperature": 0.1, "return_full_text": False}})
+            # كنعيطو لـ Llama 3 عبر Groq
+            response = requests.post(API_URL, headers=headers, json=payload)
             
             if response.status_code == 200:
-                result = response.json()[0]['generated_text']
+                result = response.json()['choices'][0]['message']['content']
                 
                 # كنعزلو الـ JSON من الهضرة
                 match = re.search(r'\[\s*\{.*?\}\s*\]', result, re.DOTALL)
@@ -128,15 +136,11 @@ class ParserMetier:
                         except: qty = 1
                         if elem: compte[elem] += qty
                     
-                    st.success("✨ **Succès :** L'IA (Mistral 7B) a lu le PDF et a découvert tous les matériaux (même le béton et le PVC) ! 🧠")
+                    st.success("✨ **Succès :** L'IA (Groq Llama 3) a lu le PDF et a découvert tous les matériaux à la vitesse de l'éclair ! 🧠⚡")
                     return compte
                 else:
                     st.warning("⚠️ L'IA n'a pas pu formater le JSON correctement. (Passage au système Regex classique).")
                     return ParserMetier.parse_regex(text)
-            
-            elif response.status_code == 503:
-                st.warning("⚠️ L'IA est en cours de démarrage (Model is loading). Attendez 30 secondes et rechargez la page. (Passage au système Regex).")
-                return ParserMetier.parse_regex(text)
             else:
                 st.error(f"Erreur API ({response.status_code}). Passage au Regex.")
                 return ParserMetier.parse_regex(text)
@@ -209,7 +213,7 @@ class Exporter:
 # ==========================================
 st.title("🧠 Pipeline IA Avancé : Lecture Totale du Plan")
 
-use_ai = st.toggle("Activer l'Intelligence Artificielle (Hugging Face) pour lire tout le plan", value=True)
+use_ai = st.toggle("Activer l'Intelligence Artificielle (Groq Llama 3) pour lire tout le plan", value=True)
 
 col1, col2 = st.columns([1, 2])
 with col1:
