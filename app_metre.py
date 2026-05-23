@@ -220,10 +220,10 @@ Texte à analyser :
 # ==========================================
 class Exporter:
     @staticmethod
-    def to_excel(df, total_general, metadata):
+    def to_excel(df, total_general, metadata, logo_bytes=None):
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='Métré_Détaillé', startrow=7)
+            df.to_excel(writer, index=False, sheet_name='Métré_Détaillé', startrow=8)
             worksheet = writer.sheets['Métré_Détaillé']
             
             header_font = Font(bold=True, color="FFFFFF")
@@ -238,33 +238,49 @@ class Exporter:
             worksheet['B3'] = metadata.get('projet', 'Non spécifié')
             worksheet['A4'] = "Société / Client :"
             worksheet['B4'] = metadata.get('societe', 'Non spécifié')
-            worksheet['A5'] = "Date :"
+            worksheet['A5'] = "Date du plan :"
             date_plan = metadata.get('date_plan', '')
-            date_export = datetime.datetime.now().strftime("%d/%m/%Y")
-            worksheet['B5'] = f"{date_plan if date_plan else date_export}"
+            worksheet['B5'] = date_plan if date_plan else "Non spécifiée"
+            
+            worksheet['A6'] = "Généré le :"
+            date_export = datetime.datetime.now().strftime("%d/%m/%Y à %H:%M")
+            worksheet['B6'] = date_export
             
             worksheet['A3'].font = Font(bold=True, color="1F4E78")
             worksheet['A4'].font = Font(bold=True, color="1F4E78")
             worksheet['A5'].font = Font(bold=True, color="1F4E78")
+            worksheet['A6'].font = Font(bold=True, color="1F4E78")
+            
+            if logo_bytes:
+                try:
+                    from openpyxl.drawing.image import Image as OpenpyxlImage
+                    img = OpenpyxlImage(BytesIO(logo_bytes))
+                    # Redimensionner l'image pour qu'elle tienne dans l'en-tête (Hauteur ~80px)
+                    ratio = 80 / img.height
+                    img.height = 80
+                    img.width = int(img.width * ratio)
+                    worksheet.add_image(img, 'F2')
+                except Exception:
+                    pass
             
             col_widths = {'A': 25, 'B': 35, 'C': 30, 'D': 10, 'E': 15, 'F': 18, 'G': 18}
             for col_letter, width in col_widths.items():
                 worksheet.column_dimensions[col_letter].width = width
                 
             for col_num in range(len(df.columns)):
-                cell = worksheet.cell(row=8, column=col_num+1)
+                cell = worksheet.cell(row=9, column=col_num+1)
                 cell.font = header_font
                 cell.fill = header_fill
                 cell.border = border
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             
-            for row_idx, row in enumerate(df.values, 9):
+            for row_idx, row in enumerate(df.values, 10):
                 for col_idx, value in enumerate(row, 1):
                     cell = worksheet.cell(row=row_idx, column=col_idx, value=value)
                     cell.border = border
                     if col_idx in [6, 7]: cell.number_format = '#,##0.00'
                         
-            total_row = len(df) + 4
+            total_row = len(df) + 10
             worksheet.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=6)
             worksheet.cell(row=total_row, column=1, value="TOTAL GÉNÉRAL").font = Font(bold=True)
             worksheet.cell(row=total_row, column=1).alignment = Alignment(horizontal="right")
@@ -303,6 +319,7 @@ if "total_general" not in st.session_state: st.session_state.total_general = 0.0
 if "last_file_name" not in st.session_state: st.session_state.last_file_name = None
 
 if "metadata" not in st.session_state: st.session_state.metadata = {}
+if "logo_bytes" not in st.session_state: st.session_state.logo_bytes = None
 
 col1, col2 = st.columns([1, 2])
 with col1:
@@ -314,6 +331,7 @@ if uploaded_file is not None:
         st.session_state.df = None
         st.session_state.total_general = 0.0
         st.session_state.metadata = {}
+        st.session_state.logo_bytes = None
         st.session_state.last_file_name = uploaded_file.name
         
     with col1:
@@ -323,6 +341,25 @@ if uploaded_file is not None:
     if start_btn:
         doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
         pdf_type = PDFClassifier.classify(doc)
+        
+        # Extraction du logo (la plus grande image trouvée dans le document)
+        logo_bytes = None
+        for page in doc:
+            images = page.get_images(full=True)
+            if images:
+                max_size = 0
+                for img in images:
+                    try:
+                        base_image = doc.extract_image(img[0])
+                        w, h = base_image["width"], base_image["height"]
+                        if w * h > max_size:
+                            max_size = w * h
+                            best_img = base_image["image"]
+                    except: pass
+                if max_size > 5000: # Ignorer les petites icônes
+                    logo_bytes = best_img
+                    break
+        st.session_state.logo_bytes = logo_bytes
         
         if pdf_type == "VECTORIEL":
             text = ExtractionEngine.extract_vectoriel(doc)
@@ -392,15 +429,19 @@ if uploaded_file is not None:
         md_col2.info(f"**💼 Client/Bureau :** {metadata.get('societe', 'Non spécifié')}")
         
         date_plan = metadata.get('date_plan', '')
-        date_export = datetime.datetime.now().strftime("%d/%m/%Y")
-        md_col3.info(f"**📅 Date :** {date_plan if date_plan else date_export}")
+        date_export = datetime.datetime.now().strftime("%d/%m/%Y à %H:%M")
+        md_col3.info(f"**📅 Date / Heure :** {date_export}")
         
         st.dataframe(df.style.format({"Prix Unitaire": "{:,.2f}", "Total Ligne": "{:,.2f}"}), use_container_width=True)
         
         st.write("### 📤 Étape 4 : Exports BTP")
         exp_col1, exp_col2 = st.columns(2)
         
+        file_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+        file_name_excel = f"METRE_{file_date}.xlsx"
+        file_name_csv = f"METRE_{file_date}.csv"
+        
         with exp_col1:
-            st.download_button("📊 Télécharger Fichier EXCEL", Exporter.to_excel(df, total_general, metadata), "Metre_PRO.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
+            st.download_button("📊 Télécharger Fichier EXCEL", Exporter.to_excel(df, total_general, metadata, st.session_state.logo_bytes), file_name_excel, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
         with exp_col2:
-            st.download_button("📑 Télécharger Fichier CSV", Exporter.to_csv(df), "ERP_Import.csv", "text/csv", use_container_width=True)
+            st.download_button("📑 Télécharger Fichier CSV", Exporter.to_csv(df), file_name_csv, "text/csv", use_container_width=True)
