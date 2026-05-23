@@ -158,15 +158,20 @@ class ParserMetier:
 Ta mission est d'extraire les éléments structuraux pour créer un tableau de nomenclature exact.
 
 RÈGLE ABSOLUE : Tu DOIS extraire absolument tous les éléments, y compris les détails des assemblages :
-- Profilés principaux : Poteaux, Potelets, Traverses, Pannes, Liernes, Bracons, Lisses, Supports.
-- Pièces d'assemblages (très important) : Platines d'about, Plaques d'assise (Pied de poteau), Bêches, Raidisseurs (d'âme ou extérieurs), Echantignoles, Goussets, Tiges d'ancrage, Plaquettes d'appui, Jarrets.
+- Profilés principaux : Poteaux, Potelets, Traverses, Poutres, Sablières, Pannes, Contreventements, Cadre périphérique, Lisses et sous lisses.
+- Pièces d'assemblages : Platines, Plaques d'assise, Bêches, Raidisseurs, Echantignoles, Goussets, Tiges d'ancrage, Jarrets.
 
 Structure chaque ligne avec : 
 - pos (numéro de position si présent)
-- nomenclature (Le rôle de la pièce, ex: POTEAU, BECHE, RAIDISSEUR POTEAU, PLATINE PIED DE POTEAU, TIGE D'ANCRAGE)
-- designation (La section/profilé ou les dimensions de plaque, ex: IPE400, HEA120, L50*5, TN300*300*20, ROND Ø24)
+- nomenclature (Le rôle exact, ex: POTEAU, POUTRE, SABLIERE, PANNE, CONTREVENTEMENT, PLATINE PIED DE POTEAU, RAIDISSEUR, GOUSSET)
+- designation (La section/profilé ou les dimensions de plaque, ex: HEA240, IPE120, L80*8, TN 2000*1000*25, ROND Ø24)
 - quantite (nombre)
-- longueur_mm (longueur en mm, null si non applicable, souvent null pour les platines)
+- longueur_mm (longueur en mm. Si non précisée dans le texte, mets null)
+
+TRÈS IMPORTANT : 
+1. N'invente AUCUN élément. Extrais uniquement ce qui se trouve dans le texte.
+2. Ne fais PAS de boucles infinies ou de répétitions inutiles.
+3. Ne recopie PAS bêtement les exemples ci-dessous.
 
 Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exacte :
 {{
@@ -176,8 +181,8 @@ Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exa
         "date_plan": "<Remplace par la date, sinon laisse vide>"
     }},
     "materiaux": [
-        {{"pos": "1", "nomenclature": "POTEAU", "designation": "IPE400", "quantite": 14, "longueur_mm": 4000}},
-        {{"pos": "57", "nomenclature": "PLATINE PIED DE POTEAU", "designation": "TN300*300*20", "quantite": 14, "longueur_mm": null}}
+        {{"pos": "1", "nomenclature": "<Extrais la nomenclature, ex: POTEAU>", "designation": "<Extrais la désignation, ex: HEA240>", "quantite": 4, "longueur_mm": 6000}},
+        {{"pos": "2", "nomenclature": "<Extrais la nomenclature, ex: PLATINE PIED DE POTEAU>", "designation": "<Extrais la désignation, ex: TN 2000*1000*25>", "quantite": 1, "longueur_mm": null}}
     ]
 }}
 
