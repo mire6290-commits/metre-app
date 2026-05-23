@@ -151,6 +151,17 @@ class ParserMetier:
         }
         clean_text = re.sub(r'\s+', ' ', text)
         
+        # Recherche intelligente de la zone de nomenclature
+        start_idx = 0
+        keywords = ['nomenclature', 'désignation', 'repère', 'ipe', 'hea', 'poteau', 'platine']
+        for kw in keywords:
+            idx = clean_text.lower().find(kw)
+            if idx != -1:
+                start_idx = max(0, idx - 300)
+                break
+                
+        text_to_send = clean_text[start_idx : start_idx + 4000]
+        
         prompt = f"""Tu es un expert en BTP et Métré de Charpente Métallique. Analyse le texte suivant extrait d'un plan.
 Ta mission est d'extraire les éléments structuraux pour créer un tableau de nomenclature exact.
 
@@ -179,7 +190,7 @@ Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exa
 }}
 
 Texte à analyser :
-{clean_text[:4000]}
+{text_to_send}
 """
         
         payload = {
@@ -379,7 +390,11 @@ if uploaded_file is not None:
                     st.session_state.total_net = total_net
                     st.session_state.metadata = metadata
                 else:
-                    st.warning("⚠️ Aucun élément trouvé.")
+                    st.warning("⚠️ Aucun élément trouvé dans le plan.")
+                    with st.expander("🔍 Mode Débogage (Voir pourquoi l'IA n'a rien trouvé)"):
+                        st.write("Le texte envoyé à l'IA était peut-être incomplet ou le plan est illisible.")
+                        st.text_area("Texte analysé (Max 4000 caractères) :", text[:4000], height=200)
+                        st.text_area("Réponse brute de l'IA :", resultats_dict.get('raw_response', ''), height=200)
         else:
             st.error("❌ PDF illisible ou scanné sans OCR.")
 
