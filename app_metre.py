@@ -634,9 +634,9 @@ if uploaded_file is not None:
                         ref = item.get("element", "Inconnu")
                         info_db = get_item_info(ref)
                         
-                        unite = item.get("unite", "")
-                        if unite == "": 
-                            unite = info_db["unite"]
+                        unite_db = info_db["unite"]
+                        unite = item.get("unite", unite_db)
+                        if unite == "": unite = unite_db
                             
                         nbre_pieces = item.get("nbre_pieces", 1)
                         if nbre_pieces is None or str(nbre_pieces).strip() == "": nbre_pieces = 1
@@ -644,27 +644,37 @@ if uploaded_file is not None:
                             try: nbre_pieces = int(nbre_pieces)
                             except: nbre_pieces = 1
                         
-                        longueur = item.get("longueur_unitaire_m", None)
+                        longueur_raw = item.get("longueur_unitaire_m", None)
+                        longueur = None
+                        if longueur_raw is not None and str(longueur_raw).strip() != "":
+                            match_l = re.search(r'(\d+(?:\.\d+)?)', str(longueur_raw).replace(',', '.'))
+                            if match_l: longueur = float(match_l.group(1))
+                        
                         poids_ml_or_u = info_db["poids_u"]
                         
-                        if unite == "ml" and longueur is not None and str(longueur).replace('.','',1).isdigit():
-                            l_m = float(longueur)
-                            long_mm = int(l_m * 1000)
-                            poids_kg_unt = l_m * poids_ml_or_u
+                        if unite_db == "ml":
                             poids_kg_m = poids_ml_or_u
+                            if longueur is not None:
+                                long_mm = int(longueur * 1000)
+                                poids_kg_unt = round(longueur * poids_kg_m, 3)
+                                poids_tot_kg = round(nbre_pieces * poids_kg_unt, 3)
+                            else:
+                                long_mm = "L=?"
+                                poids_kg_unt = "L=?"
+                                poids_tot_kg = "L=?"
                         else:
                             long_mm = "------"
+                            poids_kg_m = "------"
                             poids_kg_unt = poids_ml_or_u
-                            poids_kg_m = "------" if unite == "U" else poids_ml_or_u
-                            
-                        poids_tot_kg = nbre_pieces * poids_kg_unt
+                            poids_tot_kg = round(nbre_pieces * poids_kg_unt, 3)
                         
                         infos_supp = item.get("infos", "")
                         key = f"{role}____{ref}____{infos_supp}____{long_mm}____{poids_kg_m}____{poids_kg_unt}"
                         
                         if key in grouped_data:
                             grouped_data[key]["Quantité"] += nbre_pieces
-                            grouped_data[key]["Poids Tot Kg"] += poids_tot_kg
+                            if isinstance(poids_tot_kg, (int, float)) and isinstance(grouped_data[key]["Poids Tot Kg"], (int, float)):
+                                grouped_data[key]["Poids Tot Kg"] += poids_tot_kg
                         else:
                             grouped_data[key] = {
                                 "Nomenclatures": role,
@@ -672,11 +682,12 @@ if uploaded_file is not None:
                                 "Désignation": ref,
                                 "Long (mm)": long_mm,
                                 "Poids Kg/(m)": poids_kg_m,
-                                "Poids Kg/Unt": round(poids_kg_unt, 3),
+                                "Poids Kg/Unt": poids_kg_unt if isinstance(poids_kg_unt, str) else round(poids_kg_unt, 3),
                                 "Poids Tot Kg": poids_tot_kg
                             }
                         
-                        tot += poids_tot_kg
+                        if isinstance(poids_tot_kg, (int, float)):
+                            tot += poids_tot_kg
                         
                     data = list(grouped_data.values())
                         
