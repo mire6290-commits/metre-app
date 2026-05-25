@@ -206,49 +206,54 @@ def get_item_info(item_name):
     densite = 0.00785
     
     # -> A) CORNIÈRES (ex: L50x5, L70*7, Corniere 50x50x5)
-    match_l = re.search(r'(?:CORNIERE|CORNIÈRE|L)\s*(\d+)(?:X|\*)(\d+)', item_upper)
+    match_l = re.search(r'\b(?:CORNIERE|CORNIÈRE|L)\s*(\d+)(?:X|\*)(\d+)', item_upper)
     if match_l:
         a = float(match_l.group(1))
         e = float(match_l.group(2))
         poids_calcule = ((2 * a - e) * e) * densite
         return {"desc": f"Cornière à ailes égales {int(a)}x{int(e)}", "unite": "ml", "poids_u": round(poids_calcule, 2)}
         
-    # -> B) PLATS (ex: PLAT 100x10)
-    match_plat = re.search(r'PLAT\s*(\d+)(?:X|\*)(\d+)', item_upper)
+    # -> B) PLATS (ex: PLAT 100x10, PL 100x10)
+    match_plat = re.search(r'\b(?:PLAT|PL)\s*(\d+)(?:X|\*)(\d+)(?!\s*(?:X|\*))', item_upper)
     if match_plat:
         larg = float(match_plat.group(1))
         ep = float(match_plat.group(2))
         return {"desc": f"Plat Acier {int(larg)}x{int(ep)}", "unite": "ml", "poids_u": round(larg * ep * densite, 2)}
         
     # -> C) TUBES CARRÉS / RECTANGULAIRES (ex: TUBE 100x100x4)
-    match_tube_rect = re.search(r'TUBE(?:.*?)(\d+)(?:X|\*)(\d+)(?:X|\*)(\d+)', item_upper)
+    match_tube_rect = re.search(r'\b(?:TUBE|TC|TR)(?:.*?)(\d+)(?:X|\*)(\d+)(?:X|\*)(\d+)', item_upper)
     if match_tube_rect:
         a = float(match_tube_rect.group(1))
         b = float(match_tube_rect.group(2))
         e = float(match_tube_rect.group(3))
-        # Poids approx pour tube rectangulaire (périmètre moyen * épaisseur)
         poids_calcule = (2 * (a + b) - 4 * e) * e * densite
         return {"desc": f"Tube Rectangulaire/Carré {int(a)}x{int(b)} ép:{int(e)}", "unite": "ml", "poids_u": round(poids_calcule, 2)}
         
     # -> D) TUBES RONDS (ex: TUBE Ø114.3x3.2)
-    match_tube_rond = re.search(r'TUBE(?:.*?)(\d+(?:\.\d+)?)(?:X|\*)(\d+(?:\.\d+)?)', item_upper)
+    match_tube_rond = re.search(r'\b(?:TUBE|TROND)(?:.*?)(?:Ø|O)?\s*(\d+(?:\.\d+)?)(?:X|\*)(\d+(?:\.\d+)?)', item_upper)
     if match_tube_rond:
         d = float(match_tube_rond.group(1))
         e = float(match_tube_rond.group(2))
         poids_calcule = math.pi * (d - e) * e * densite
         return {"desc": f"Tube Rond Ø{d} ép:{e}", "unite": "ml", "poids_u": round(poids_calcule, 2)}
         
-    # -> E) TÔLES NOIRES / PLATINES / RAIDISSEURS (ex: TN300*300*20)
-    match_tn = re.search(r'(?:TN|PLAQUE|PLATINE|RAIDISSEUR)(?:.*?)(\d+)(?:X|\*)(\d+)(?:X|\*)(\d+)', item_upper)
+    # -> E) TÔLES NOIRES / PLATINES / RAIDISSEURS (ex: TN300*300*20, PL 15X275X160)
+    match_tn = re.search(r'\b(?:TN|PLAQUE|PLATINE|RAIDISSEUR|PL)(?:.*?)(\d+)(?:X|\*)(\d+)(?:X|\*)(\d+)', item_upper)
     if match_tn:
         a = float(match_tn.group(1))
         b = float(match_tn.group(2))
         e = float(match_tn.group(3))
-        # Poids d'une plaque (Volume en m3 * 8000 kg/m3 pour inclure marge soudures/découpe comme dans la pratique)
         poids_calcule = (a / 1000) * (b / 1000) * (e / 1000) * 8000
         return {"desc": f"Platine/Tôle {int(a)}x{int(b)} ép:{int(e)}", "unite": "U", "poids_u": round(poids_calcule, 3)}
 
-    # 3. Base de données classique (Boulons, Platines, Béton, etc.)
+    # -> F) BOULONS (ex: M16, M20x50)
+    match_boulon = re.search(r'\bM\s*(\d+)', item_upper)
+    if match_boulon:
+        diam = int(match_boulon.group(1))
+        poids_u = 0.05 + (diam / 100) # Poids estimatif
+        return {"desc": f"Boulon d'assemblage M{diam}", "unite": "U", "poids_u": round(poids_u, 3)}
+
+    # 3. Base de données classique (Béton, etc.)
     for key in BASE_DONNEES.keys():
         if key.replace(" ", "") in item_upper:
             return BASE_DONNEES[key]
