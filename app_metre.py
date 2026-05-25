@@ -62,7 +62,7 @@ header {visibility: hidden;}
 # ==========================================
 # 0. API KEY ET BASE DE DONNÉES
 # ==========================================
-GROQ_TOKEN = "gsk_" + "rL7iv9leEcHqfbdKrnlvWGdyb3FYSrEtimGJWVH6NruYOP3pFqsG"
+GROQ_TOKEN = "gsk_" + "cVs6luXGdAoyHqRSG3BVWGdyb3FYK4P0tNs1a2g1izU6K87AhGTk"
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # CATALOGUE DES POIDS DES PROFILÉS MÉTALLIQUES (en Kg / ml) - Basé sur ArcelorMittal
@@ -285,12 +285,21 @@ class ExtractionEngine:
             
             # 2. Si le texte est faible ou si la page contient des images (plan mixte), on force l'OCR et Vision
             try:
-                pix = page.get_pixmap(dpi=150) # 150 DPI pour équilibre Vitesse/Qualité
+                pix = page.get_pixmap(dpi=300) # 300 DPI pour Extra Vision / Qualité Maximale
                 
                 # Sauvegarde en base64 pour la Vision IA (Max 2 pages pour éviter la surcharge)
                 if i < 2:
                     import base64
-                    b64 = base64.b64encode(pix.tobytes("jpeg")).decode('utf-8')
+                    # Pour éviter des payloads gigantesques avec 300 DPI, on enregistre en JPEG avec qualité optimisée
+                    img = Image.open(io.BytesIO(pix.tobytes("jpeg")))
+                    
+                    # Optionnel : si l'image dépasse 4000 pixels (Plan A0/A1), on limite sa taille pour ne pas crasher l'API Groq
+                    if max(img.size) > 4000:
+                        img.thumbnail((4000, 4000), Image.Resampling.LANCZOS)
+                        
+                    buffered = io.BytesIO()
+                    img.save(buffered, format="JPEG", quality=85)
+                    b64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
                     images_b64.append(b64)
                     
                 images = page.get_images(full=True)
