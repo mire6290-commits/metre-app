@@ -190,27 +190,69 @@ BASE_DONNEES = {
     "BARDAGE": {"desc": "Revêtement / Bardage", "unite": "m²", "poids_u": 10.0},
 }
 
+import re
+import math
+
 def get_item_info(item_name):
     item_upper = item_name.upper().replace(" ", "")
     
-    # Recherche dans le catalogue ArcelorMittal (IPE, HEA, etc.)
+    # 1. Recherche dans le catalogue ArcelorMittal (IPE, HEA, etc.)
     for profil_key, poids_ml in CATALOGUE_PROFILS.items():
         if profil_key in item_upper:
-            return {"desc": f"Profilé métallique {profil_key} (Acier S275)", "unite": "ml", "poids_u": poids_ml}
+            return {"desc": f"Profilé {profil_key} (Acier S275)", "unite": "ml", "poids_u": poids_ml}
             
+    # 2. Calculateur Automatique (Intelligence) pour Profilés Formés à Froid & Plats
+    # Densité de l'acier = 7850 kg/m³ -> 0.00785 kg/mm²/m
+    densite = 0.00785
+    
+    # -> A) CORNIÈRES (ex: L50x5, L70*7, Corniere 50x50x5)
+    match_l = re.search(r'(?:CORNIERE|CORNIÈRE|L)\s*(\d+)(?:X|\*)(\d+)', item_upper)
+    if match_l:
+        a = float(match_l.group(1))
+        e = float(match_l.group(2))
+        poids_calcule = ((2 * a - e) * e) * densite
+        return {"desc": f"Cornière à ailes égales {int(a)}x{int(e)}", "unite": "ml", "poids_u": round(poids_calcule, 2)}
+        
+    # -> B) PLATS (ex: PLAT 100x10)
+    match_plat = re.search(r'PLAT\s*(\d+)(?:X|\*)(\d+)', item_upper)
+    if match_plat:
+        larg = float(match_plat.group(1))
+        ep = float(match_plat.group(2))
+        return {"desc": f"Plat Acier {int(larg)}x{int(ep)}", "unite": "ml", "poids_u": round(larg * ep * densite, 2)}
+        
+    # -> C) TUBES CARRÉS / RECTANGULAIRES (ex: TUBE 100x100x4)
+    match_tube_rect = re.search(r'TUBE(?:.*?)(\d+)(?:X|\*)(\d+)(?:X|\*)(\d+)', item_upper)
+    if match_tube_rect:
+        a = float(match_tube_rect.group(1))
+        b = float(match_tube_rect.group(2))
+        e = float(match_tube_rect.group(3))
+        # Poids approx pour tube rectangulaire (périmètre moyen * épaisseur)
+        poids_calcule = (2 * (a + b) - 4 * e) * e * densite
+        return {"desc": f"Tube Rectangulaire/Carré {int(a)}x{int(b)} ép:{int(e)}", "unite": "ml", "poids_u": round(poids_calcule, 2)}
+        
+    # -> D) TUBES RONDS (ex: TUBE Ø114.3x3.2)
+    match_tube_rond = re.search(r'TUBE(?:.*?)(\d+(?:\.\d+)?)(?:X|\*)(\d+(?:\.\d+)?)', item_upper)
+    if match_tube_rond:
+        d = float(match_tube_rond.group(1))
+        e = float(match_tube_rond.group(2))
+        poids_calcule = math.pi * (d - e) * e * densite
+        return {"desc": f"Tube Rond Ø{d} ép:{e}", "unite": "ml", "poids_u": round(poids_calcule, 2)}
+
+    # 3. Base de données classique (Boulons, Platines, Béton, etc.)
     for key in BASE_DONNEES.keys():
         if key.replace(" ", "") in item_upper:
             return BASE_DONNEES[key]
             
     if "BÉTON" in item_upper or "BETON" in item_upper: return {"desc": "Ouvrage en Béton", "unite": "m3", "poids_u": 2500.0}
-    if "TUBE" in item_upper or "PVC" in item_upper: return {"desc": f"Tube {item_name}", "unite": "ml", "poids_u": 2.0}
+    if "TUBE" in item_upper or "PVC" in item_upper: return {"desc": f"Tube PVC {item_name}", "unite": "ml", "poids_u": 1.5}
     if "TOLE" in item_upper or "TÔLE" in item_upper or "BARDAGE" in item_upper: return {"desc": f"Tôle / Bardage", "unite": "m²", "poids_u": 10.0}
     if "SIKA" in item_upper: return {"desc": "Produit d'étanchéité/scellement", "unite": "Sac", "poids_u": 25.0}
     if "BOULON" in item_upper or "BLS" in item_upper or "TIGE" in item_upper: return {"desc": f"Fixation {item_name}", "unite": "U", "poids_u": 0.20}
     if "PL" in item_upper or "PLATINE" in item_upper or "GOUSSET" in item_upper: return {"desc": f"Platine / Gousset", "unite": "U", "poids_u": 5.0}
     
+    # 4. Fallback pour Profilés Inconnus
     if "IPE" in item_upper or "HEA" in item_upper or "UPN" in item_upper or "HEB" in item_upper: 
-        return {"desc": f"Profilé métallique {item_name} (Standard inconnu)", "unite": "ml", "poids_u": 50.0}
+        return {"desc": f"Profilé {item_name} (Standard inconnu)", "unite": "ml", "poids_u": 50.0}
         
     return {"desc": f"Élément divers ({item_name})", "unite": "Ens", "poids_u": 1.0}
 
