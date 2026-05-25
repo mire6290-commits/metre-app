@@ -307,7 +307,16 @@ Ta mission est d'extraire 1) Les informations du projet (Cartouche) et 2) TOUS l
 
 RÈGLE ABSOLUE : Tu DOIS extraire absolument TOUT ce qui ressemble à un matériau ou élément de construction, même si ce n'est pas standard. Ne laisse RIEN de côté. Si un élément est mentionné plusieurs fois, additionne les quantités.
 TRÈS IMPORTANT POUR LA CATÉGORISATION : Tu DOIS déterminer le rôle structural de chaque élément (ex: Poteau, Poutre, Panne, Lisse, Contreventement, Traverse, Platine, Boulonnerie, Divers). Ajoute un champ "role" pour chaque matériau.
-TRÈS IMPORTANT POUR L'ACIER : Pour les PROFILÉS MÉTALLIQUES (IPE, HEA, HEB, UPN, Cornières), l'unité standard est le mètre linéaire ("ml"). Si le texte donne le nombre de pièces et la longueur (ex: 12 IPE 400 de 200mm), tu DOIS calculer la longueur totale en mètres (ici 12 * 0.2 = 2.4m) et mettre "quantite": 2.4, "unite": "ml". Si la longueur n'est pas indiquée, mets le nombre de pièces ("unite": "U") et mentionne "Longueur inconnue" dans 'infos'.
+TRÈS IMPORTANT POUR L'ACIER ET LES LONGUEURS : Pour les PROFILÉS MÉTALLIQUES (IPE, HEA, HEB, UPN, Tubes, Cornières), l'unité est le mètre linéaire ("ml").
+Dans les plans de charpente, la longueur est souvent cachée sous ces formes:
+- "L=6.5" ou "L=6500" ou "L: 6500" (en mm souvent)
+- "lg: 200" ou "longueur 6m"
+- "IPE 400 x 6000" (le x 6000 signifie 6000mm = 6m)
+- "8 IPE 400 de 200mm"
+Tu DOIS IMPÉRATIVEMENT chercher ces indications de longueur pour chaque profilé!
+RÈGLE DE CALCUL : Multiplie le nombre de pièces par la longueur unitaire en MÈTRES.
+Exemple : "4 IPE 200 L=6500" -> 4 pièces * 6.5m = 26m. Tu mets "quantite": 26, "unite": "ml", "infos": "4 pièces de 6.5m".
+Si et SEULEMENT SI tu es absolument certain qu'aucune longueur n'est indiquée nulle part pour ce profilé, mets le nombre de pièces avec "unite": "U" et "infos": "Longueur inconnue". Mais CHERCHE BIEN LA LONGUEUR D'ABORD!
 
 Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exacte :
 {{
