@@ -237,6 +237,16 @@ def get_item_info(item_name):
         e = float(match_tube_rond.group(2))
         poids_calcule = math.pi * (d - e) * e * densite
         return {"desc": f"Tube Rond Ø{d} ép:{e}", "unite": "ml", "poids_u": round(poids_calcule, 2)}
+        
+    # -> E) TÔLES NOIRES / PLATINES / RAIDISSEURS (ex: TN300*300*20)
+    match_tn = re.search(r'(?:TN|PLAQUE|PLATINE|RAIDISSEUR)(?:.*?)(\d+)(?:X|\*)(\d+)(?:X|\*)(\d+)', item_upper)
+    if match_tn:
+        a = float(match_tn.group(1))
+        b = float(match_tn.group(2))
+        e = float(match_tn.group(3))
+        # Poids d'une plaque (Volume en m3 * 8000 kg/m3 pour inclure marge soudures/découpe comme dans la pratique)
+        poids_calcule = (a / 1000) * (b / 1000) * (e / 1000) * 8000
+        return {"desc": f"Platine/Tôle {int(a)}x{int(b)} ép:{int(e)}", "unite": "U", "poids_u": round(poids_calcule, 3)}
 
     # 3. Base de données classique (Boulons, Platines, Béton, etc.)
     for key in BASE_DONNEES.keys():
@@ -618,45 +628,49 @@ if uploaded_file is not None:
                             unite = info_db["unite"]
                             
                         nbre_pieces = item.get("nbre_pieces", 1)
-                        if nbre_pieces is None: nbre_pieces = 1
+                        if nbre_pieces is None or str(nbre_pieces).strip() == "": nbre_pieces = 1
+                        else:
+                            try: nbre_pieces = int(nbre_pieces)
+                            except: nbre_pieces = 1
                         
                         longueur = item.get("longueur_unitaire_m", None)
-                        if longueur is None: longueur = ""
+                        poids_ml_or_u = info_db["poids_u"]
+                        
+                        if unite == "ml" and longueur is not None and str(longueur).replace('.','',1).isdigit():
+                            l_m = float(longueur)
+                            long_mm = int(l_m * 1000)
+                            poids_kg_unt = l_m * poids_ml_or_u
+                            poids_kg_m = poids_ml_or_u
+                        else:
+                            long_mm = "------"
+                            poids_kg_unt = poids_ml_or_u
+                            poids_kg_m = "------" if unite == "U" else poids_ml_or_u
                             
-                        try: qty = float(item.get("quantite", 1))
-                        except: qty = 1.0
+                        poids_tot_kg = nbre_pieces * poids_kg_unt
                         
                         infos_supp = item.get("infos", "")
-                        poids_u = info_db["poids_u"]
-                        total_ligne = qty * poids_u
-                        
-                        key = f"{role}____{ref}____{infos_supp}____{unite}____{poids_u}____{longueur}"
+                        key = f"{role}____{ref}____{infos_supp}____{long_mm}____{poids_kg_m}____{poids_kg_unt}"
                         
                         if key in grouped_data:
-                            try: grouped_data[key]["Nbre Pièces"] += int(nbre_pieces)
-                            except: pass
-                            grouped_data[key]["Quantité"] += qty
-                            grouped_data[key]["Poids Total"] += total_ligne
+                            grouped_data[key]["Quantité"] += nbre_pieces
+                            grouped_data[key]["Poids Tot Kg"] += poids_tot_kg
                         else:
                             grouped_data[key] = {
-                                "Catégorie / Rôle": role,
-                                "Référence": ref,
-                                "Désignation": info_db["desc"],
-                                "Infos / Dimensions": infos_supp,
-                                "Nbre Pièces": int(nbre_pieces) if str(nbre_pieces).isdigit() else 1,
-                                "Longueur U. (m)": longueur,
-                                "Unité": unite,
-                                "Quantité": qty,
-                                "Poids Unitaire": poids_u,
-                                "Poids Total": total_ligne
+                                "Nomenclatures": role,
+                                "Quantité": nbre_pieces,
+                                "Désignation": ref,
+                                "Long (mm)": long_mm,
+                                "Poids Kg/(m)": poids_kg_m,
+                                "Poids Kg/Unt": round(poids_kg_unt, 3),
+                                "Poids Tot Kg": poids_tot_kg
                             }
                         
-                        tot += total_ligne
+                        tot += poids_tot_kg
                         
                     data = list(grouped_data.values())
                         
                     # Sauvegarde dans la session (Mémoire)
-                    st.session_state.df = pd.DataFrame(data).sort_values(by="Poids Total", ascending=False)
+                    st.session_state.df = pd.DataFrame(data).sort_values(by="Poids Tot Kg", ascending=False)
                     st.session_state.total_general = tot
                     st.session_state.metadata = metadata
                 else:
@@ -698,8 +712,8 @@ if uploaded_file is not None:
         # Création d'une copie du dataframe pour l'affichage avec la ligne TOTAL
         df_display = df.copy()
         total_row_df = pd.DataFrame([{
-            "Catégorie / Rôle": "TOTAL GÉNÉRAL", "Référence": "", "Désignation": "", "Infos / Dimensions": "", 
-            "Unité": "", "Quantité": None, "Poids Unitaire": None, "Poids Total": total_general
+            "Nomenclatures": "TOTAL GÉNÉRAL", "Quantité": None, "Désignation": "", "Long (mm)": "", 
+            "Poids Kg/(m)": "", "Poids Kg/Unt": None, "Poids Tot Kg": total_general
         }])
         df_display = pd.concat([df_display, total_row_df], ignore_index=True)
         
@@ -708,7 +722,7 @@ if uploaded_file is not None:
             if s.name == len(df_display) - 1: return ['background-color: #f39c12; color: white; font-weight: bold'] * len(s)
             return [''] * len(s)
             
-        st.dataframe(df_display.style.apply(highlight_total, axis=1).format({"Poids Unitaire": "{:,.2f}", "Poids Total": "{:,.2f}"}, na_rep=""), use_container_width=True)
+        st.dataframe(df_display.style.apply(highlight_total, axis=1).format({"Poids Kg/Unt": "{:,.3f}", "Poids Tot Kg": "{:,.2f}"}, na_rep=""), use_container_width=True)
         
         st.write("### 📝 Synthèse du Plan")
         st.info(metadata.get('description', "Aucune description trouvée dans ce plan."))
