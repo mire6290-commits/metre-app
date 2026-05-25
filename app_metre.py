@@ -381,7 +381,7 @@ Texte à analyser :
         model_name = "llama-3.1-8b-instant"
         
         if images_b64 and len(images_b64) > 0:
-            model_name = "llama-3.2-90b-vision-preview"
+            model_name = "llama-3.2-11b-vision-preview"
             for b64 in images_b64:
                 messages[0]["content"].append({
                     "type": "image_url",
@@ -691,8 +691,8 @@ if uploaded_file is not None:
                         
                     data = list(grouped_data.values())
                         
-                    # Sauvegarde dans la session (Mémoire)
-                    st.session_state.df = pd.DataFrame(data).sort_values(by="Poids Tot Kg", ascending=False)
+                    # Sauvegarde dans la session (Mémoire) sans tri pour éviter le crash avec "L=?"
+                    st.session_state.df = pd.DataFrame(data)
                     st.session_state.total_general = tot
                     st.session_state.metadata = metadata
                 else:
