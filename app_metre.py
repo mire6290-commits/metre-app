@@ -311,8 +311,19 @@ class ExtractionEngine:
                     
                 images = page.get_images(full=True)
                 if len(page_text) < 1000 or len(images) > 0:
+                    from PIL import ImageEnhance, ImageOps
                     img = Image.open(io.BytesIO(pix.tobytes("jpeg")))
-                    ocr_text = pytesseract.image_to_string(img, lang="fra").strip()
+                    
+                    # Pre-traitement OCR pour Plans BTP (Amélioration nette des cotations)
+                    img = img.convert('L') # Niveaux de gris
+                    enhancer = ImageEnhance.Contrast(img)
+                    img = enhancer.enhance(2.0) # Augmenter le contraste
+                    
+                    # Binarisation (Seuillage)
+                    img = img.point(lambda x: 0 if x < 140 else 255, '1')
+                    
+                    # Paramètre psm 11 : Recherche de texte dispersé (Idéal pour les plans)
+                    ocr_text = pytesseract.image_to_string(img, lang="fra", config='--psm 11').strip()
                     page_text += "\n" + ocr_text
             except Exception:
                 pass
@@ -347,8 +358,8 @@ Dans les plans de charpente, la longueur est souvent cachée sous ces formes:
 - "lg: 200" ou "longueur 6m"
 - "IPE 400 x 6000" (le x 6000 signifie 6000mm = 6m)
 - "8 IPE 400 de 200mm"
-TRÈS IMPORTANT POUR LES COTATIONS : Le texte extrait contient les cotations scannées (ex: nombres 6000, 4500) lues par l'OCR. Associe ces nombres aux profilés qui les précèdent.
-Tu DOIS IMPÉRATIVEMENT chercher ces indications de longueur pour chaque profilé!
+TRÈS IMPORTANT POUR LES COTATIONS (Lignes de côtes) : L'extraction OCR peut être désordonnée (Texte dispersé). Les dimensions de longueur (ex: 6000, 4500, 1500) se trouvent souvent juste avant, juste après, ou quelques lignes au-dessus/en dessous du nom du profilé (ex: IPE 200). 
+Tu DOIS utiliser ton intelligence pour associer le nombre le plus logique (souvent en mm) qui représente la longueur de l'élément en te basant sur la proximité du texte.
 RÈGLE DE CALCUL : 
 - Ajoute les champs "nbre_pieces" (entier) et "longueur_unitaire_m" (nombre décimal en mètres).
 - Si la longueur n'est pas connue, mets "longueur_unitaire_m": null.
