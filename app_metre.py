@@ -309,22 +309,19 @@ class ExtractionEngine:
                     b64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
                     images_b64.append(b64)
                     
-                images = page.get_images(full=True)
-                if len(page_text) < 1000 or len(images) > 0:
-                    from PIL import ImageEnhance, ImageOps
-                    img = Image.open(io.BytesIO(pix.tobytes("jpeg")))
-                    
-                    # Pre-traitement OCR pour Plans BTP (Amélioration nette des cotations)
-                    img = img.convert('L') # Niveaux de gris
-                    enhancer = ImageEnhance.Contrast(img)
-                    img = enhancer.enhance(2.0) # Augmenter le contraste
-                    
-                    # Binarisation (Seuillage)
-                    img = img.point(lambda x: 0 if x < 140 else 255, '1')
-                    
-                    # Paramètre psm 11 : Recherche de texte dispersé (Idéal pour les plans)
-                    ocr_text = pytesseract.image_to_string(img, lang="fra", config='--psm 11').strip()
-                    page_text += "\n" + ocr_text
+                # --- FORCE OCR POUR TOUT PLAN BTP ---
+                # Le texte vectoriel est souvent désordonné. L'OCR avec psm 11 garde la disposition des cotations
+                from PIL import ImageEnhance, ImageOps
+                img = Image.open(io.BytesIO(pix.tobytes("jpeg")))
+                
+                # Pre-traitement Doux (Gris + Contraste) sans binarisation dure qui effacerait les lignes grises
+                img = img.convert('L') # Niveaux de gris
+                enhancer = ImageEnhance.Contrast(img)
+                img = enhancer.enhance(2.5) # Augmenter le contraste très fort
+                
+                # Paramètre psm 11 : Recherche de texte dispersé (Idéal pour les plans)
+                ocr_text = pytesseract.image_to_string(img, lang="fra", config='--psm 11').strip()
+                page_text += "\n" + ocr_text
             except Exception:
                 pass
             
