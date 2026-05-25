@@ -530,7 +530,7 @@ if uploaded_file is not None:
                         info_db = get_item_info(ref)
                         
                         unite = item.get("unite", "")
-                        if unite == "" or unite == "U": 
+                        if unite == "": 
                             unite = info_db["unite"]
                             
                         try: qty = float(item.get("quantite", 1))
