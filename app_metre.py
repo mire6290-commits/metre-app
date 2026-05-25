@@ -342,7 +342,7 @@ Dans les plans de charpente, la longueur est souvent cachée sous ces formes:
 - "lg: 200" ou "longueur 6m"
 - "IPE 400 x 6000" (le x 6000 signifie 6000mm = 6m)
 - "8 IPE 400 de 200mm"
-TRÈS IMPORTANT POUR LES COTATIONS : Tu as accès aux images du plan ! Regarde attentivement les lignes de cotation (les flèches avec des nombres comme 6000, 4500) dessinées à côté des profilés. Utilise ta vision pour associer la cotation visuelle au profilé !
+TRÈS IMPORTANT POUR LES COTATIONS : Le texte extrait contient les cotations scannées (ex: nombres 6000, 4500) lues par l'OCR. Associe ces nombres aux profilés qui les précèdent.
 Tu DOIS IMPÉRATIVEMENT chercher ces indications de longueur pour chaque profilé!
 RÈGLE DE CALCUL : 
 - Ajoute les champs "nbre_pieces" (entier) et "longueur_unitaire_m" (nombre décimal en mètres).
@@ -368,27 +368,16 @@ Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exa
 Texte à analyser :
 {clean_text[:12000]}
 """
-        
         messages = [
             {
                 "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt}
-                ]
+                "content": prompt
             }
         ]
         
-        model_name = "llama-3.1-8b-instant"
-        
-        if images_b64 and len(images_b64) > 0:
-            model_name = "llama-3.2-11b-vision-preview"
-            for b64 in images_b64:
-                messages[0]["content"].append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{b64}"
-                    }
-                })
+        # Groq a supprimé tous les modèles Vision (11b et 90b). 
+        # On utilise le modèle le plus puissant (70b-versatile) avec le texte OCR 300 DPI.
+        model_name = "llama-3.3-70b-versatile"
                 
         payload = {
             "model": model_name,
@@ -744,7 +733,7 @@ if uploaded_file is not None:
             if s.name == len(df_display) - 1: return ['background-color: #f39c12; color: white; font-weight: bold'] * len(s)
             return [''] * len(s)
             
-        st.dataframe(df_display.style.apply(highlight_total, axis=1).format({"Poids Kg/Unt": "{:,.3f}", "Poids Tot Kg": "{:,.2f}"}, na_rep=""), use_container_width=True)
+        st.dataframe(df_display.style.apply(highlight_total, axis=1), use_container_width=True)
         
         st.write("### 📝 Synthèse du Plan")
         st.info(metadata.get('description', "Aucune description trouvée dans ce plan."))
