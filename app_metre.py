@@ -355,11 +355,11 @@ TRÈS IMPORTANT POUR LA CATÉGORISATION : Tu DOIS déterminer le rôle structura
 TRÈS IMPORTANT POUR L'ACIER ET LES LONGUEURS : Pour les PROFILÉS MÉTALLIQUES (IPE, HEA, HEB, UPN, Tubes, Cornières), l'unité est le mètre linéaire ("ml").
 Dans les plans de charpente, la longueur est souvent cachée sous ces formes:
 - "L=6.5" ou "L=6500" ou "L: 6500" (en mm souvent)
-- "lg: 200" ou "longueur 6m"
-- "IPE 400 x 6000" (le x 6000 signifie 6000mm = 6m)
-- "8 IPE 400 de 200mm"
-TRÈS IMPORTANT POUR LES COTATIONS (Lignes de côtes) : L'extraction OCR peut être désordonnée (Texte dispersé). Les dimensions de longueur (ex: 6000, 4500, 1500) se trouvent souvent juste avant, juste après, ou quelques lignes au-dessus/en dessous du nom du profilé (ex: IPE 200). 
-Tu DOIS utiliser ton intelligence pour associer le nombre le plus logique (souvent en mm) qui représente la longueur de l'élément en te basant sur la proximité du texte.
+TRÈS IMPORTANT POUR LES COTATIONS (RÈGLES D'IDENTIFICATION) :
+1. Les références de profilés (IPE, HEA, HEB, UPN) ont des tailles standards (ex: IPE 80 à 600). Le nombre qui suit directement le mot "IPE" (ex: le 200 dans IPE 200) est la RÉFÉRENCE, CE N'EST JAMAIS LA LONGUEUR !
+2. Si tu vois un nombre SUPÉRIEUR à 500 isolé ou avec des flèches/lignes (ex: 6000, 4500, 1500), c'est une COTATION en millimètres (mm). Convertis-la en MÈTRES (ex: 6000 -> 6.0) pour le champ "longueur_unitaire_m".
+3. Si tu vois un nombre entre 1 et 30 avec une décimale (ex: 6.5, 4.2), c'est probablement une cotation directement en mètres.
+4. L'extraction OCR peut être désordonnée. Utilise ton intelligence pour associer le bon nombre (Cotation) au profilé le plus proche.
 RÈGLE DE CALCUL : 
 - Ajoute les champs "nbre_pieces" (entier) et "longueur_unitaire_m" (nombre décimal en mètres).
 - Si la longueur n'est pas connue, mets "longueur_unitaire_m": null.
@@ -451,18 +451,66 @@ Texte à analyser :
 
     @staticmethod
     def parse_regex(text):
-        elements = []
-        profiles = re.findall(r'\b(IPE|HEA|HEB|UPN)\s*(\d+)\b', text, re.IGNORECASE)
-        for p in profiles: elements.append({"element": f"{p[0].upper()}{p[1]}", "infos": "", "unite": "U", "quantite": 1})
+        elements = {}
+        lines = text.split('\n')
+        
+        ipes_valides = [80,100,120,140,160,180,200,220,240,270,300,330,360,400,450,500,550,600]
+        hea_valides  = [100,120,140,160,180,200,220,240,260,280,300,320,340,360,400,450,500]
+
+        for i, line in enumerate(lines):
+            line_upper = line.upper()
             
-        cornieres = re.findall(r'\bL\s*(\d+\*\d+)\b', text, re.IGNORECASE)
-        for c in cornieres: elements.append({"element": f"Cornière L{c}", "infos": "", "unite": "U", "quantite": 1})
+            # Extraction Profilés Métalliques standards avec Qté
+            for match in re.finditer(r'(?:(\d+)\s*[xX\*]?\s*)?\b(IPE|HEA|HEB|UPN)\s*(\d{2,4})\b', line_upper):
+                qty_str = match.group(1)
+                type_prof = match.group(2)
+                taille = int(match.group(3))
+                
+                # Validation stricte de la référence
+                if "IPE" in type_prof and taille not in ipes_valides: continue
+                if "HEA" in type_prof and taille not in hea_valides: continue
+                
+                nbre_pieces = int(qty_str) if qty_str else 1
+                profil_name = f"{type_prof} {taille}"
+                longueur_m = None
+                
+                # 1. Chercher L= ou lg= ou x 6000
+                l_match = re.search(r'(?:L|LG|LONG|LONGUEUR)\s*[=:]?\s*(\d+(?:\.\d+)?)', line_upper)
+                if l_match:
+                    val = float(l_match.group(1))
+                    longueur_m = val / 1000 if val >= 500 else val
+                else:
+                    # 2. Chercher Cotation isolée (> 500) à proximité
+                    context = line_upper + " " + (lines[i+1].upper() if i+1 < len(lines) else "")
+                    numbers = re.findall(r'\b(\d{3,4})\b', context)
+                    for n_str in numbers:
+                        n = int(n_str)
+                        # Règle : Si n > 500 et n n'est pas une taille de profilé courant
+                        if n > 500 and n not in ipes_valides and n not in hea_valides:
+                            longueur_m = n / 1000
+                            break
+                            
+                key = f"{profil_name}___{longueur_m}"
+                if key in elements:
+                    elements[key]["nbre_pieces"] += nbre_pieces
+                else:
+                    elements[key] = {"element": profil_name, "infos": "", "unite": "ml", "nbre_pieces": nbre_pieces, "longueur_unitaire_m": longueur_m}
             
-        boulons = re.findall(r'(\d+)\s*Bls\s*(M\d+)', text, re.IGNORECASE)
-        for b in boulons:
-            elements.append({"element": f"Boulon {b[1].upper()}", "infos": "", "unite": "U", "quantite": int(b[0])})
-            
-        return {"metadata": {"projet": "Inconnu", "societe": "Inconnu", "date_plan": "", "description": "Extraction manuelle Regex."}, "materiaux": elements}
+            # Extraction Cornières
+            for match in re.finditer(r'(?:(\d+)\s*[xX\*]?\s*)?\bL\s*(\d+\*\d+)\b', line_upper):
+                qty = int(match.group(1)) if match.group(1) else 1
+                key = f"Cornière L{match.group(2)}___None"
+                if key in elements: elements[key]["nbre_pieces"] += qty
+                else: elements[key] = {"element": f"Cornière L{match.group(2)}", "infos": "", "unite": "ml", "nbre_pieces": qty, "longueur_unitaire_m": None}
+                
+            # Extraction Boulons
+            for match in re.finditer(r'(?:(\d+)\s*Bls\s*)?\bM\s*(\d+)\b', line_upper):
+                qty = int(match.group(1)) if match.group(1) else 1
+                key = f"Boulon M{match.group(2)}___None"
+                if key in elements: elements[key]["nbre_pieces"] += qty
+                else: elements[key] = {"element": f"Boulon M{match.group(2)}", "infos": "", "unite": "U", "nbre_pieces": qty, "longueur_unitaire_m": None}
+
+        return {"metadata": {"projet": "Inconnu", "societe": "Extraction Regex BTP", "date_plan": "", "description": "Mode Expert Hybride."}, "materiaux": list(elements.values())}
 
 # ==========================================
 # 3. Exporter
