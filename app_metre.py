@@ -295,7 +295,9 @@ class ExtractionEngine:
                     
                     # Optionnel : si l'image dépasse 4000 pixels (Plan A0/A1), on limite sa taille pour ne pas crasher l'API Groq
                     if max(img.size) > 4000:
-                        img.thumbnail((4000, 4000), Image.Resampling.LANCZOS)
+                        try: resample_filter = Image.Resampling.LANCZOS
+                        except AttributeError: resample_filter = Image.LANCZOS
+                        img.thumbnail((4000, 4000), resample_filter)
                         
                     buffered = io.BytesIO()
                     img.save(buffered, format="JPEG", quality=85)
