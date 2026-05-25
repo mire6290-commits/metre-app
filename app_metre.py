@@ -362,6 +362,7 @@ RÈGLE CRITIQUE — Différencier cotation et référence :
    - Nombre sur une ligne de cote (entre flèches ├───┤)
    - Grand nombre isolé (>500) sans code profil avant
    - En mm → diviser par 1000 pour avoir les mètres
+   - RÈGLE D'OR : Prends UNIQUEMENT les nombres situés IMMÉDIATEMENT à côté de la pièce (avant ou après). Ne cherche pas trop loin dans le texte pour ne pas mélanger les longueurs.
    Exemple : "L=6000" → longueur_unitaire_m = 6.0
 
 3. QUANTITÉ = nombre AVANT un élément
@@ -493,8 +494,8 @@ Texte à analyser :
                     val = float(l_match.group(1))
                     longueur_m = val / 1000 if val >= 500 else val
                 else:
-                    # 2. Chercher Cotation isolée (> 500) à proximité
-                    context = line_upper + " " + (lines[i+1].upper() if i+1 < len(lines) else "")
+                    # 2. Chercher Cotation isolée (> 500) IMMÉDIATEMENT à côté (même ligne)
+                    context = line_upper
                     numbers = re.findall(r'\b(\d{3,4})\b', context)
                     for n_str in numbers:
                         n = int(n_str)
