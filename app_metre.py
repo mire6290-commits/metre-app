@@ -323,9 +323,12 @@ Dans les plans de charpente, la longueur est souvent cachée sous ces formes:
 - "8 IPE 400 de 200mm"
 TRÈS IMPORTANT POUR LES COTATIONS : Tu as accès aux images du plan ! Regarde attentivement les lignes de cotation (les flèches avec des nombres comme 6000, 4500) dessinées à côté des profilés. Utilise ta vision pour associer la cotation visuelle au profilé !
 Tu DOIS IMPÉRATIVEMENT chercher ces indications de longueur pour chaque profilé!
-RÈGLE DE CALCUL : Multiplie le nombre de pièces par la longueur unitaire en MÈTRES.
-Exemple : "4 IPE 200 L=6500" -> 4 pièces * 6.5m = 26m. Tu mets "quantite": 26, "unite": "ml", "infos": "4 pièces de 6.5m".
-Si et SEULEMENT SI tu es absolument certain qu'aucune longueur n'est indiquée nulle part pour ce profilé (ni dans le texte, ni sur les cotations de l'image), mets le nombre de pièces avec "unite": "U" et "infos": "Longueur inconnue". Mais CHERCHE BIEN LA LONGUEUR D'ABORD!
+RÈGLE DE CALCUL : 
+- Ajoute les champs "nbre_pieces" (entier) et "longueur_unitaire_m" (nombre décimal en mètres).
+- Si la longueur n'est pas connue, mets "longueur_unitaire_m": null.
+- Multiplie le nombre de pièces par la longueur unitaire en MÈTRES.
+Exemple : "4 IPE 200 L=6500" -> Tu mets "nbre_pieces": 4, "longueur_unitaire_m": 6.5, "quantite": 26, "unite": "ml", "infos": "4 pièces de 6.5m".
+Si et SEULEMENT SI tu es absolument certain qu'aucune longueur n'est indiquée nulle part pour ce profilé (ni dans le texte, ni sur les cotations de l'image), mets "nbre_pieces": 4, "longueur_unitaire_m": null, "unite": "U" et "infos": "Longueur inconnue". Mais CHERCHE BIEN LA LONGUEUR D'ABORD!
 
 Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exacte :
 {{
@@ -336,8 +339,8 @@ Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exa
         "description": "Un bref résumé (1-2 phrases) de ce que représente ce plan (ex: Construction métallique d'un auvent...). Laisse vide si introuvable."
     }},
     "materiaux": [
-        {{"role": "Poutre", "element": "IPE 400", "infos": "12 pièces de 200mm", "unite": "ml", "quantite": 2.4}},
-        {{"role": "Évacuation", "element": "TUBE EN PVC", "infos": "DN125", "unite": "ml", "quantite": 5}}
+        {{"role": "Poutre", "element": "IPE 400", "infos": "12 pièces", "nbre_pieces": 12, "longueur_unitaire_m": 0.2, "unite": "ml", "quantite": 2.4}},
+        {{"role": "Évacuation", "element": "TUBE EN PVC", "infos": "DN125", "nbre_pieces": 5, "longueur_unitaire_m": null, "unite": "ml", "quantite": 5}}
     ]
 }}
 
@@ -614,6 +617,12 @@ if uploaded_file is not None:
                         if unite == "": 
                             unite = info_db["unite"]
                             
+                        nbre_pieces = item.get("nbre_pieces", 1)
+                        if nbre_pieces is None: nbre_pieces = 1
+                        
+                        longueur = item.get("longueur_unitaire_m", None)
+                        if longueur is None: longueur = ""
+                            
                         try: qty = float(item.get("quantite", 1))
                         except: qty = 1.0
                         
@@ -621,9 +630,11 @@ if uploaded_file is not None:
                         poids_u = info_db["poids_u"]
                         total_ligne = qty * poids_u
                         
-                        key = f"{role}____{ref}____{infos_supp}____{unite}____{poids_u}"
+                        key = f"{role}____{ref}____{infos_supp}____{unite}____{poids_u}____{longueur}"
                         
                         if key in grouped_data:
+                            try: grouped_data[key]["Nbre Pièces"] += int(nbre_pieces)
+                            except: pass
                             grouped_data[key]["Quantité"] += qty
                             grouped_data[key]["Poids Total"] += total_ligne
                         else:
@@ -632,6 +643,8 @@ if uploaded_file is not None:
                                 "Référence": ref,
                                 "Désignation": info_db["desc"],
                                 "Infos / Dimensions": infos_supp,
+                                "Nbre Pièces": int(nbre_pieces) if str(nbre_pieces).isdigit() else 1,
+                                "Longueur U. (m)": longueur,
                                 "Unité": unite,
                                 "Quantité": qty,
                                 "Poids Unitaire": poids_u,
