@@ -263,7 +263,8 @@ class ParserMetier:
         prompt = f"""Tu es un expert en BTP et Métré. Analyse le texte suivant extrait d'un plan d'architecture/charpente.
 Ta mission est d'extraire 1) Les informations du projet (Cartouche) et 2) TOUS les matériaux.
 
-RÈGLE ABSOLUE : Tu DOIS extraire absolument TOUT ce qui ressemble à un matériau ou élément de construction, même si ce n'est pas standard (ex: Lierne, Lisse, Panne, Poutre, IPE, HEA, Tube, Béton, Acier, Armature, Ø12, Boulon, Platine, Cornière, etc.). Ne laisse RIEN de côté. Si un élément est mentionné plusieurs fois, additionne les quantités.
+RÈGLE ABSOLUE : Tu DOIS extraire absolument TOUT ce qui ressemble à un matériau ou élément de construction, même si ce n'est pas standard. Ne laisse RIEN de côté. Si un élément est mentionné plusieurs fois, additionne les quantités.
+TRÈS IMPORTANT POUR LA CATÉGORISATION : Tu DOIS déterminer le rôle structural de chaque élément (ex: Poteau, Poutre, Panne, Lisse, Contreventement, Traverse, Platine, Boulonnerie, Divers). Ajoute un champ "role" pour chaque matériau.
 TRÈS IMPORTANT POUR L'ACIER : Pour les PROFILÉS MÉTALLIQUES (IPE, HEA, HEB, UPN, Cornières), l'unité standard est le mètre linéaire ("ml"). Si le texte donne le nombre de pièces et la longueur (ex: 12 IPE 400 de 200mm), tu DOIS calculer la longueur totale en mètres (ici 12 * 0.2 = 2.4m) et mettre "quantite": 2.4, "unite": "ml". Si la longueur n'est pas indiquée, mets le nombre de pièces ("unite": "U") et mentionne "Longueur inconnue" dans 'infos'.
 
 Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exacte :
@@ -275,8 +276,8 @@ Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exa
         "description": "Un bref résumé (1-2 phrases) de ce que représente ce plan (ex: Construction métallique d'un auvent...). Laisse vide si introuvable."
     }},
     "materiaux": [
-        {{"element": "TUBE EN PVC", "infos": "DN125", "unite": "ml", "quantite": 5}},
-        {{"element": "IPE 400", "infos": "12 pièces de 200mm", "unite": "ml", "quantite": 2.4}}
+        {{"role": "Poutre", "element": "IPE 400", "infos": "12 pièces de 200mm", "unite": "ml", "quantite": 2.4}},
+        {{"role": "Évacuation", "element": "TUBE EN PVC", "infos": "DN125", "unite": "ml", "quantite": 5}}
     ]
 }}
 
@@ -401,7 +402,7 @@ class Exporter:
                 except Exception:
                     pass
             
-            col_widths = {'A': 25, 'B': 35, 'C': 30, 'D': 10, 'E': 15, 'F': 18, 'G': 18}
+            col_widths = {'A': 20, 'B': 25, 'C': 35, 'D': 30, 'E': 10, 'F': 15, 'G': 18, 'H': 18}
             for col_letter, width in col_widths.items():
                 worksheet.column_dimensions[col_letter].width = width
                 
@@ -416,14 +417,14 @@ class Exporter:
                 for col_idx, value in enumerate(row, 1):
                     cell = worksheet.cell(row=row_idx, column=col_idx, value=value)
                     cell.border = border
-                    if col_idx in [6, 7]: cell.number_format = '#,##0.00'
+                    if col_idx in [7, 8]: cell.number_format = '#,##0.00'
                         
             total_row = len(df) + 10
-            worksheet.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=6)
+            worksheet.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=7)
             worksheet.cell(row=total_row, column=1, value="TOTAL GÉNÉRAL").font = Font(bold=True)
             worksheet.cell(row=total_row, column=1).alignment = Alignment(horizontal="right")
             
-            cell_total = worksheet.cell(row=total_row, column=7, value=total_general)
+            cell_total = worksheet.cell(row=total_row, column=8, value=total_general)
             cell_total.font = Font(bold=True, color="9C0006")
             cell_total.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
             cell_total.number_format = '#,##0.00'
@@ -524,6 +525,7 @@ if uploaded_file is not None:
                     tot = 0.0
                     
                     for item in resultats:
+                        role = item.get("role", "Divers")
                         ref = item.get("element", "Inconnu")
                         info_db = get_item_info(ref)
                         
@@ -538,13 +540,14 @@ if uploaded_file is not None:
                         poids_u = info_db["poids_u"]
                         total_ligne = qty * poids_u
                         
-                        key = f"{ref}____{infos_supp}____{unite}____{poids_u}"
+                        key = f"{role}____{ref}____{infos_supp}____{unite}____{poids_u}"
                         
                         if key in grouped_data:
                             grouped_data[key]["Quantité"] += qty
                             grouped_data[key]["Poids Total"] += total_ligne
                         else:
                             grouped_data[key] = {
+                                "Catégorie / Rôle": role,
                                 "Référence": ref,
                                 "Désignation": info_db["desc"],
                                 "Infos / Dimensions": infos_supp,
@@ -601,7 +604,7 @@ if uploaded_file is not None:
         # Création d'une copie du dataframe pour l'affichage avec la ligne TOTAL
         df_display = df.copy()
         total_row_df = pd.DataFrame([{
-            "Référence": "TOTAL GÉNÉRAL", "Désignation": "", "Infos / Dimensions": "", 
+            "Catégorie / Rôle": "TOTAL GÉNÉRAL", "Référence": "", "Désignation": "", "Infos / Dimensions": "", 
             "Unité": "", "Quantité": None, "Poids Unitaire": None, "Poids Total": total_general
         }])
         df_display = pd.concat([df_display, total_row_df], ignore_index=True)
