@@ -23,29 +23,35 @@ st.markdown("""
 footer {visibility: hidden;}
 header {visibility: hidden;}
 
-/* Design du Header / Logo */
+/* Fond global de l'application en clair */
+.stApp {
+    background-color: #f4f6f9;
+}
+
+/* Design du Header / Logo - Thème Clair */
 .header-container {
-    background-color: #1a2c42;
+    background-color: #ffffff;
     padding: 20px;
     border-radius: 10px;
     margin-bottom: 30px;
     display: flex;
     align-items: center;
-    border-left: 8px solid #f39c12;
+    border-left: 8px solid #3498db;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }
 .logo-icon {
     font-size: 45px;
     margin-right: 20px;
 }
 .app-title {
-    color: white;
+    color: #2c3e50;
     font-size: 30px;
     font-weight: 800;
     margin: 0;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 .app-subtitle {
-    color: #bdc3c7;
+    color: #7f8c8d;
     font-size: 15px;
     margin: 0;
     margin-top: 5px;
