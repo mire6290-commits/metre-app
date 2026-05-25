@@ -352,14 +352,27 @@ Ta mission est d'extraire 1) Les informations du projet (Cartouche) et 2) TOUS l
 
 RÈGLE ABSOLUE : Tu DOIS extraire absolument TOUT ce qui ressemble à un matériau ou élément de construction, même si ce n'est pas standard. Ne laisse RIEN de côté. Si un élément est mentionné plusieurs fois, additionne les quantités.
 TRÈS IMPORTANT POUR LA CATÉGORISATION : Tu DOIS déterminer le rôle structural de chaque élément (ex: Poteau, Poutre, Panne, Lisse, Contreventement, Traverse, Platine, Boulonnerie, Divers). Ajoute un champ "role" pour chaque matériau.
-TRÈS IMPORTANT POUR L'ACIER ET LES LONGUEURS : Pour les PROFILÉS MÉTALLIQUES (IPE, HEA, HEB, UPN, Tubes, Cornières), l'unité est le mètre linéaire ("ml").
-Dans les plans de charpente, la longueur est souvent cachée sous ces formes:
-- "L=6.5" ou "L=6500" ou "L: 6500" (en mm souvent)
-TRÈS IMPORTANT POUR LES COTATIONS (RÈGLES D'IDENTIFICATION) :
-1. Les références de profilés (IPE, HEA, HEB, UPN) ont des tailles standards (ex: IPE 80 à 600). Le nombre qui suit directement le mot "IPE" (ex: le 200 dans IPE 200) est la RÉFÉRENCE, CE N'EST JAMAIS LA LONGUEUR !
-2. Si tu vois un nombre SUPÉRIEUR à 500 isolé ou avec des flèches/lignes (ex: 6000, 4500, 1500), c'est une COTATION en millimètres (mm). Convertis-la en MÈTRES (ex: 6000 -> 6.0) pour le champ "longueur_unitaire_m".
-3. Si tu vois un nombre entre 1 et 30 avec une décimale (ex: 6.5, 4.2), c'est probablement une cotation directement en mètres.
-4. L'extraction OCR peut être désordonnée. Utilise ton intelligence pour associer le bon nombre (Cotation) au profilé le plus proche.
+RÈGLE CRITIQUE — Différencier cotation et référence :
+
+1. RÉFÉRENCE DE PROFIL = code standard (IPE 80-600, HEA 100-1000, HEB 100-1000, UPN 80-400). Le nombre fait partie du NOM du produit.
+   Exemple : "IPE 400" → element="IPE 400", PAS une cotation de 400mm.
+
+2. COTATION = dimension d'un ouvrage. Reconnaître par :
+   - Précédé de L= / lg= / longueur / L:
+   - Nombre sur une ligne de cote (entre flèches ├───┤)
+   - Grand nombre isolé (>500) sans code profil avant
+   - En mm → diviser par 1000 pour avoir les mètres
+   Exemple : "L=6000" → longueur_unitaire_m = 6.0
+
+3. QUANTITÉ = nombre AVANT un élément
+   Exemple : "8 IPE 400" → nbre_pieces=8, element="IPE 400"
+
+4. BOULON : "M16 HR" → element="BOULON M16", le 16 = diamètre (nom)
+
+NE JAMAIS confondre :
+❌ FAUX : "IPE 400 L=6000" → element="IPE 6000"  
+✅ JUSTE : element="IPE 400", longueur_unitaire_m=6.0
+
 RÈGLE DE CALCUL : 
 - Ajoute les champs "nbre_pieces" (entier) et "longueur_unitaire_m" (nombre décimal en mètres).
 - Si la longueur n'est pas connue, mets "longueur_unitaire_m": null.
