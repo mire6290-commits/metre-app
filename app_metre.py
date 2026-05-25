@@ -358,7 +358,7 @@ RÈGLE CRITIQUE — Différencier cotation et référence :
    Exemple : "IPE 400" → element="IPE 400", PAS une cotation de 400mm.
 
 2. COTATION = dimension d'un ouvrage. Reconnaître par :
-   - Précédé de L= / lg= / longueur / L:
+   - Précédé de lg= / longueur / lg:
    - Nombre sur une ligne de cote (entre flèches ├───┤)
    - Grand nombre isolé (>500) sans code profil avant
    - En mm → diviser par 1000 pour avoir les mètres
@@ -488,8 +488,8 @@ Texte à analyser :
                 profil_name = f"{type_prof} {taille}"
                 longueur_m = None
                 
-                # 1. Chercher L= ou lg= ou x 6000
-                l_match = re.search(r'(?:L|LG|LONG|LONGUEUR)\s*[=:]?\s*(\d+(?:\.\d+)?)', line_upper)
+                # 1. Chercher lg= ou longueur= ou x 6000
+                l_match = re.search(r'(?:LG|LONG|LONGUEUR)\s*[=:]?\s*(\d+(?:\.\d+)?)', line_upper)
                 if l_match:
                     val = float(l_match.group(1))
                     longueur_m = val / 1000 if val >= 500 else val
