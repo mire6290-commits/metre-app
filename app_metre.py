@@ -262,8 +262,9 @@ def get_item_info(item_name):
 class ExtractionEngine:
     @staticmethod
     def extract_all(doc):
-        st.info("📖 **Lecture hybride intelligente :** Le système lit le texte et scanne les images page par page... ⏳")
+        st.info("📖 **Lecture hybride intelligente (Texte + Vision) :** Le système lit le texte, scanne les images et analyse les lignes de cotation... ⏳")
         full_text = ""
+        images_b64 = []
         
         progress_bar = st.progress(0)
         total_pages = len(doc)
@@ -272,29 +273,36 @@ class ExtractionEngine:
             # 1. Tentative d'extraction vectorielle
             page_text = page.get_text("text").strip()
             
-            # 2. Si le texte est faible ou si la page contient des images (plan mixte), on force l'OCR
-            images = page.get_images(full=True)
-            if len(page_text) < 1000 or len(images) > 0:
-                try:
-                    pix = page.get_pixmap(dpi=150) # 150 DPI pour équilibre Vitesse/Qualité
+            # 2. Si le texte est faible ou si la page contient des images (plan mixte), on force l'OCR et Vision
+            try:
+                pix = page.get_pixmap(dpi=150) # 150 DPI pour équilibre Vitesse/Qualité
+                
+                # Sauvegarde en base64 pour la Vision IA (Max 2 pages pour éviter la surcharge)
+                if i < 2:
+                    import base64
+                    b64 = base64.b64encode(pix.tobytes("jpeg")).decode('utf-8')
+                    images_b64.append(b64)
+                    
+                images = page.get_images(full=True)
+                if len(page_text) < 1000 or len(images) > 0:
                     img = Image.open(io.BytesIO(pix.tobytes("jpeg")))
                     ocr_text = pytesseract.image_to_string(img, lang="fra").strip()
                     page_text += "\n" + ocr_text
-                except Exception:
-                    pass
+            except Exception:
+                pass
             
             full_text += f"\n--- PAGE {i+1} ---\n" + page_text
             progress_bar.progress((i + 1) / total_pages)
             
         progress_bar.empty()
-        return full_text
+        return full_text, images_b64
 
 # ==========================================
 # 2. Parser Métier (Intégration Llama 3.1 - JSON PRO)
 # ==========================================
 class ParserMetier:
     @staticmethod
-    def parse_with_ai(text):
+    def parse_with_ai(text, images_b64=None):
         headers = {
             "Authorization": f"Bearer {GROQ_TOKEN}",
             "Content-Type": "application/json"
@@ -313,10 +321,11 @@ Dans les plans de charpente, la longueur est souvent cachée sous ces formes:
 - "lg: 200" ou "longueur 6m"
 - "IPE 400 x 6000" (le x 6000 signifie 6000mm = 6m)
 - "8 IPE 400 de 200mm"
+TRÈS IMPORTANT POUR LES COTATIONS : Tu as accès aux images du plan ! Regarde attentivement les lignes de cotation (les flèches avec des nombres comme 6000, 4500) dessinées à côté des profilés. Utilise ta vision pour associer la cotation visuelle au profilé !
 Tu DOIS IMPÉRATIVEMENT chercher ces indications de longueur pour chaque profilé!
 RÈGLE DE CALCUL : Multiplie le nombre de pièces par la longueur unitaire en MÈTRES.
 Exemple : "4 IPE 200 L=6500" -> 4 pièces * 6.5m = 26m. Tu mets "quantite": 26, "unite": "ml", "infos": "4 pièces de 6.5m".
-Si et SEULEMENT SI tu es absolument certain qu'aucune longueur n'est indiquée nulle part pour ce profilé, mets le nombre de pièces avec "unite": "U" et "infos": "Longueur inconnue". Mais CHERCHE BIEN LA LONGUEUR D'ABORD!
+Si et SEULEMENT SI tu es absolument certain qu'aucune longueur n'est indiquée nulle part pour ce profilé (ni dans le texte, ni sur les cotations de l'image), mets le nombre de pièces avec "unite": "U" et "infos": "Longueur inconnue". Mais CHERCHE BIEN LA LONGUEUR D'ABORD!
 
 Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exacte :
 {{
@@ -336,9 +345,30 @@ Texte à analyser :
 {clean_text[:12000]}
 """
         
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt}
+                ]
+            }
+        ]
+        
+        model_name = "llama-3.1-8b-instant"
+        
+        if images_b64 and len(images_b64) > 0:
+            model_name = "llama-3.2-90b-vision-preview"
+            for b64 in images_b64:
+                messages[0]["content"].append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{b64}"
+                    }
+                })
+                
         payload = {
-            "model": "llama-3.1-8b-instant",
-            "messages": [{"role": "user", "content": prompt}],
+            "model": model_name,
+            "messages": messages,
             "temperature": 0.1
         }
         
@@ -559,14 +589,14 @@ if uploaded_file is not None:
                     break
         st.session_state.logo_bytes = logo_bytes
         
-        # Extraction hybride du texte complet
-        text = ExtractionEngine.extract_all(doc)
+        # Extraction hybride du texte complet et des images pour la Vision IA
+        text, images_b64 = ExtractionEngine.extract_all(doc)
         
         if text and len(text.strip()) > 10:
-            with st.spinner("⏳ Analyse intelligente en cours... Veuillez patienter (Cela peut prendre 10 à 30 secondes)."):
+            with st.spinner("⏳ Analyse intelligente avec Vision IA en cours... Veuillez patienter (Cela peut prendre 10 à 30 secondes)."):
                 
                 # Exécution silencieuse et automatique de l'analyse intelligente
-                resultats_dict = ParserMetier.parse_with_ai(text)
+                resultats_dict = ParserMetier.parse_with_ai(text, images_b64)
                 metadata = resultats_dict.get("metadata", {})
                 resultats = resultats_dict.get("materiaux", [])
                 raw_response = resultats_dict.get("raw_response", "")
