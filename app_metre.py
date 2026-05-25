@@ -59,36 +59,58 @@ header {visibility: hidden;}
 GROQ_TOKEN = "gsk_" + "rL7iv9leEcHqfbdKrnlvWGdyb3FYSrEtimGJWVH6NruYOP3pFqsG"
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
+# CATALOGUE DES POIDS DES PROFILÉS MÉTALLIQUES (en Kg / ml) - Basé sur ArcelorMittal
+CATALOGUE_PROFILS = {
+    # IPE
+    "IPE80": 6.0, "IPE100": 8.1, "IPE120": 10.4, "IPE140": 12.9, "IPE160": 15.8, "IPE180": 18.8, 
+    "IPE200": 22.4, "IPE220": 26.2, "IPE240": 30.7, "IPE270": 36.1, "IPE300": 42.2, "IPE330": 49.1, 
+    "IPE360": 57.1, "IPE400": 66.3, "IPE450": 77.6, "IPE500": 90.7, "IPE550": 106.0, "IPE600": 122.0,
+    # HEA
+    "HEA100": 16.7, "HEA120": 19.9, "HEA140": 24.7, "HEA160": 30.4, "HEA180": 35.5, "HEA200": 42.3, 
+    "HEA220": 50.5, "HEA240": 60.3, "HEA260": 68.2, "HEA280": 76.4, "HEA300": 88.3, "HEA320": 97.6, 
+    "HEA340": 105.0, "HEA360": 112.0, "HEA400": 125.0, "HEA450": 140.0, "HEA500": 155.0,
+    # HEB
+    "HEB100": 20.4, "HEB120": 26.7, "HEB140": 33.7, "HEB160": 42.6, "HEB180": 51.2, "HEB200": 61.3, 
+    "HEB220": 71.5, "HEB240": 83.2, "HEB260": 93.0, "HEB280": 103.0, "HEB300": 117.0, "HEB320": 127.0, 
+    "HEB340": 134.0, "HEB360": 142.0, "HEB400": 155.0, "HEB450": 171.0, "HEB500": 187.0,
+    # UPN
+    "UPN80": 8.64, "UPN100": 10.6, "UPN120": 13.4, "UPN140": 16.0, "UPN160": 18.8, "UPN180": 22.0, 
+    "UPN200": 25.3, "UPN220": 29.4, "UPN240": 33.2, "UPN260": 37.9, "UPN280": 41.8, "UPN300": 46.2,
+}
+
 BASE_DONNEES = {
-    "IPE400": {"desc": "Profilé IPE 400 - Acier S275", "unite": "U", "poids_u": 2500.0},
-    "HEA120": {"desc": "Profilé HEA 120 - Acier S275", "unite": "U", "poids_u": 850.0},
-    "HEA300": {"desc": "Profilé HEA 300 - Acier S275", "unite": "U", "poids_u": 2100.0},
-    "UPN80": {"desc": "Profilé UPN 80", "unite": "U", "poids_u": 400.0},
-    "UPN200": {"desc": "Profilé UPN 200", "unite": "U", "poids_u": 1200.0},
-    "L70*7": {"desc": "Cornière à ailes égales 70x7", "unite": "U", "poids_u": 150.0},
-    "BOULON M16": {"desc": "Boulon d'assemblage M16 HR", "unite": "U", "poids_u": 15.0},
-    "PL 300*300*20": {"desc": "Platine d'ancrage 300x300 Ep:20mm", "unite": "U", "poids_u": 350.0},
-    "SIKAGROUT": {"desc": "Mortier de scellement Sikagrout", "unite": "Sac", "poids_u": 150.0},
-    "POTEAU BETON": {"desc": "Poteau en Béton Armé", "unite": "U", "poids_u": 1200.0},
-    "TUBE EN PVC": {"desc": "Tube PVC Évacuation", "unite": "ml", "poids_u": 35.0},
-    "BARDAGE": {"desc": "Revêtement / Bardage", "unite": "m²", "poids_u": 95.0},
+    "L70*7": {"desc": "Cornière à ailes égales 70x7", "unite": "ml", "poids_u": 7.38},
+    "BOULON M16": {"desc": "Boulon d'assemblage M16 HR", "unite": "U", "poids_u": 0.15},
+    "PL 300*300*20": {"desc": "Platine d'ancrage 300x300 Ep:20mm", "unite": "U", "poids_u": 14.13},
+    "SIKAGROUT": {"desc": "Mortier de scellement Sikagrout", "unite": "Sac", "poids_u": 25.0},
+    "POTEAU BETON": {"desc": "Poteau en Béton Armé", "unite": "m3", "poids_u": 2500.0},
+    "TUBE EN PVC": {"desc": "Tube PVC Évacuation", "unite": "ml", "poids_u": 1.5},
+    "BARDAGE": {"desc": "Revêtement / Bardage", "unite": "m²", "poids_u": 10.0},
 }
 
 def get_item_info(item_name):
-    item_upper = item_name.upper()
+    item_upper = item_name.upper().replace(" ", "")
+    
+    # Recherche dans le catalogue ArcelorMittal (IPE, HEA, etc.)
+    for profil_key, poids_ml in CATALOGUE_PROFILS.items():
+        if profil_key in item_upper:
+            return {"desc": f"Profilé métallique {profil_key} (Acier S275)", "unite": "ml", "poids_u": poids_ml}
+            
     for key in BASE_DONNEES.keys():
-        if key in item_upper:
+        if key.replace(" ", "") in item_upper:
             return BASE_DONNEES[key]
             
-    if "BÉTON" in item_upper or "BETON" in item_upper: return {"desc": "Ouvrage en Béton", "unite": "m3", "poids_u": 800.0}
-    if "TUBE" in item_upper or "PVC" in item_upper: return {"desc": f"Tube {item_name}", "unite": "ml", "poids_u": 40.0}
-    if "TOLE" in item_upper or "TÔLE" in item_upper or "BARDAGE" in item_upper: return {"desc": f"Tôle / Bardage", "unite": "m²", "poids_u": 100.0}
-    if "SIKA" in item_upper: return {"desc": "Produit d'étanchéité/scellement", "unite": "Sac", "poids_u": 150.0}
-    if "BOULON" in item_upper or "BLS" in item_upper or "TIGE" in item_upper: return {"desc": f"Fixation {item_name}", "unite": "U", "poids_u": 20.0}
-    if "IPE" in item_upper or "HEA" in item_upper or "UPN" in item_upper or "HEB" in item_upper: return {"desc": f"Profilé métallique {item_name}", "unite": "U", "poids_u": 1000.0}
-    if "PL " in item_upper or "PLATINE" in item_upper or "GOUSSET" in item_upper: return {"desc": f"Platine / Gousset", "unite": "U", "poids_u": 150.0}
+    if "BÉTON" in item_upper or "BETON" in item_upper: return {"desc": "Ouvrage en Béton", "unite": "m3", "poids_u": 2500.0}
+    if "TUBE" in item_upper or "PVC" in item_upper: return {"desc": f"Tube {item_name}", "unite": "ml", "poids_u": 2.0}
+    if "TOLE" in item_upper or "TÔLE" in item_upper or "BARDAGE" in item_upper: return {"desc": f"Tôle / Bardage", "unite": "m²", "poids_u": 10.0}
+    if "SIKA" in item_upper: return {"desc": "Produit d'étanchéité/scellement", "unite": "Sac", "poids_u": 25.0}
+    if "BOULON" in item_upper or "BLS" in item_upper or "TIGE" in item_upper: return {"desc": f"Fixation {item_name}", "unite": "U", "poids_u": 0.20}
+    if "PL" in item_upper or "PLATINE" in item_upper or "GOUSSET" in item_upper: return {"desc": f"Platine / Gousset", "unite": "U", "poids_u": 5.0}
     
-    return {"desc": f"Élément divers", "unite": "Ens", "poids_u": 250.0}
+    if "IPE" in item_upper or "HEA" in item_upper or "UPN" in item_upper or "HEB" in item_upper: 
+        return {"desc": f"Profilé métallique {item_name} (Standard inconnu)", "unite": "ml", "poids_u": 50.0}
+        
+    return {"desc": f"Élément divers ({item_name})", "unite": "Ens", "poids_u": 1.0}
 
 # ==========================================
 # 1. ExtractionEngine (Hybride : Vectoriel + OCR)
@@ -140,6 +162,7 @@ class ParserMetier:
 Ta mission est d'extraire 1) Les informations du projet (Cartouche) et 2) TOUS les matériaux.
 
 RÈGLE ABSOLUE : Tu DOIS extraire absolument TOUT ce qui ressemble à un matériau ou élément de construction, même si ce n'est pas standard (ex: Lierne, Lisse, Panne, Poutre, IPE, HEA, Tube, Béton, Acier, Armature, Ø12, Boulon, Platine, Cornière, etc.). Ne laisse RIEN de côté. Si un élément est mentionné plusieurs fois, additionne les quantités.
+TRÈS IMPORTANT POUR L'ACIER : Pour les PROFILÉS MÉTALLIQUES (IPE, HEA, HEB, UPN, Cornières), l'unité standard est le mètre linéaire ("ml"). Si le texte donne le nombre de pièces et la longueur (ex: 12 IPE 400 de 200mm), tu DOIS calculer la longueur totale en mètres (ici 12 * 0.2 = 2.4m) et mettre "quantite": 2.4, "unite": "ml". Si la longueur n'est pas indiquée, mets le nombre de pièces ("unite": "U") et mentionne "Longueur inconnue" dans 'infos'.
 
 Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exacte :
 {{
@@ -151,7 +174,7 @@ Tu dois répondre UNIQUEMENT avec un objet JSON valide ayant cette structure exa
     }},
     "materiaux": [
         {{"element": "TUBE EN PVC", "infos": "DN125", "unite": "ml", "quantite": 5}},
-        {{"element": "IPE 400", "infos": "Long = 200mm", "unite": "U", "quantite": 12}}
+        {{"element": "IPE 400", "infos": "12 pièces de 200mm", "unite": "ml", "quantite": 2.4}}
     ]
 }}
 
